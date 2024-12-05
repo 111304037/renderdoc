@@ -15,7 +15,7 @@ list(REMOVE_DUPLICATES source_cpp_list)
 include_directories(${include_dires})
 
 #使用unicode字符集
-add_definitions(-DUNICODE -D_UNICODE)
+add_win32_definitions()
 build_library(rdoc_dxgi OBJECT ${source_cpp_list})
 target_compile_definitions(rdoc_dxgi ${RDOC_DEFINITIONS})
 #添加预编译头

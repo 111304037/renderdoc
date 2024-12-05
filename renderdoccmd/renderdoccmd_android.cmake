@@ -256,11 +256,15 @@ if(ANDROID)
     # configure_file 配置文件，让你可以在代码文件中使用CMake中定义的的变量,如@VAR@ 或 ${VAR}
     # Copy in android package files, replacing the package name with the architecture-specific package name
     set(gradle_root ${CMAKE_CURRENT_BINARY_DIR}/gradle)
+    configure_file(android/icon.png ${gradle_root}/app/src/main/res/drawable/icon.png COPYONLY) #只复制，不替换内容
     configure_file(android/Loader.java ${gradle_root}/app/src/main/java/org/rdoc/renderdoccmd/${ABI_EXTENSION_NAME}/Loader.java)
     configure_file(android/AndroidManifest.xml ${gradle_root}/app/src/main/AndroidManifest.xml)
     configure_file(android/build.gradle ${gradle_root}/build.gradle)
     configure_file(android/renderdoccmd_config.cmake ${gradle_root}/app/src/main/cpp/Renderdoc/renderdoccmd/renderdoccmd_config.cmake)
-    configure_file(android/icon.png ${gradle_root}/app/src/main/res/drawable/icon.png COPYONLY) #只复制，不替换内容
+    
+    set(VS_INSTALL_PATH "")
+    string(REPLACE "\\" "/" VS_INSTALL_PATH "$ENV{env_vs}")
+    configure_file(${CMAKE_SOURCE_DIR}/cmake_script/utils.cmake ${gradle_root}/app/src/main/cpp/Renderdoc/cmake_script/utils.cmake)
 
     
     if(ENABLE_CUSTOM_WRAP_SCRIPT)
@@ -286,7 +290,7 @@ if(ANDROID)
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/renderdoccmd/android/gradle ${gradle_root}
                        #复制根CMakeLists.txt
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/CMakeLists.txt ${gradle_root}/app/src/main/cpp/Renderdoc/
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cmake_script ${gradle_root}/app/src/main/cpp/Renderdoc/cmake_script
+                    #    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/cmake_script ${gradle_root}/app/src/main/cpp/Renderdoc/cmake_script
                        #复制renderdoc工程
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/renderdoc ${gradle_root}/app/src/main/cpp/Renderdoc/renderdoc/
                        #复制renderdoccmd

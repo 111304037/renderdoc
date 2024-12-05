@@ -12,7 +12,7 @@ foreach(def ${DEFINES})
 endforeach()
 
 #使用unicode字符集
-add_definitions(-DUNICODE -D_UNICODE)
+add_win32_definitions()
 
 
 build_library(${MODULE_NAME} SHARED

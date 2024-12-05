@@ -24,7 +24,7 @@ set PATH=%env_qt%;%env_cmake%;%PATH%
 
 @REM ::PLT hook
 @REM ::-DUSE_INTERCEPTOR_LIB=On -DLLVM_DIR=H:\zip\LLVM 拦截器,http://it.taocms.org/05/69980.htm
-set CMAKE_BUILD_CMD=cmake -DCMAKE_BUILD_TYPE=Debug -DGIT_HASH=1.30 -DBRANCH_DEV=On
+set CMAKE_BUILD_CMD=cmake -DCMAKE_BUILD_TYPE=Debug -DGIT_HASH=1.36 -DBRANCH_DEV=On
 
 ::armeabi-v7a
 set build_dir=%~dp0build-win-msvc

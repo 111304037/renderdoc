@@ -647,7 +647,7 @@ endforeach()
 
 if (WIN32)
     #使用unicode字符集
-    add_definitions(-DUNICODE -D_UNICODE)
+    add_win32_definitions()
 
     foreach(def ${QMAKE_CXXFLAGS})
         #add_definitions(-Wno-${def})

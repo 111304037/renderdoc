@@ -75,7 +75,7 @@ elseif(UNIX)
 elseif(BRANCH_DEV AND WIN32)
     include(renderdocshim.cmake)
     #使用unicode字符集
-    add_definitions(-DUNICODE -D_UNICODE)
+    add_win32_definitions()
     list(APPEND sources 
         renderdoccmd_win32.cpp
         3rdparty/cmdline/cmdline.h

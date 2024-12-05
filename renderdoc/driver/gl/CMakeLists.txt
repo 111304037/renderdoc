@@ -70,7 +70,7 @@ else()
 if(BRANCH_DEV AND WIN32)
     if(ENABLE_GL)
         #使用unicode字符集
-        add_definitions(-DUNICODE -D_UNICODE)        
+        add_win32_definitions()        
         list(APPEND sources
             official/wglext.h
             wgl_dispatch_table.h

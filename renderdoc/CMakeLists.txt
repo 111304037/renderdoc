@@ -531,7 +531,7 @@ if(UNIX)
                 #     OUTPUT_STRIP_TRAILING_WHITESPACE
                 # )
                 
-                set(VS_INSTALL_PATH "C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise")
+                # set(VS_INSTALL_PATH "C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise")
                 # 提取 VsDevCmd.bat 文件的路径
                 set(VSDEV_CMD_PATH "${VS_INSTALL_PATH}/Common7/Tools/VsDevCmd.bat")
                 
@@ -691,7 +691,7 @@ if(BRANCH_DEV)
     message("RDOC_INCLUDES:${RDOC_INCLUDES}")
     if(WIN32)
         #使用unicode字符集
-        add_definitions(-DUNICODE -D_UNICODE)
+        add_win32_definitions()
         if(CMAKE_CL_64)
             list(APPEND RDOC_DEFINITIONS PRIVATE -DWIN64)
         else()

@@ -2,8 +2,7 @@
 rem Use this batch file to build box2d for Visual Studio
 chcp 936
 
-::set env_vs=E:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\Common7\IDE\
-set env_vs=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\IDE
+set env_vs=C:\Program Files\Microsoft Visual Studio\2022\Enterprise
 set ANDROID_SDK=D:\Android\sdk
 if not exist "%ANDROID_SDK%" (
 	set ANDROID_SDK=E:\App\Android\sdk
@@ -47,7 +46,7 @@ md %apk_dir%
 
 @REM ::PLT hook
 @REM ::-DUSE_INTERCEPTOR_LIB=On -DLLVM_DIR=H:\zip\LLVM 拦截器,http://it.taocms.org/05/69980.htm
-set CMAKE_BUILD_CMD=cmake -DBUILD_ANDROID=On -DANDROID_BUILD_TOOLS_VERSION=29.0.2 -DCMAKE_BUILD_TYPE=Debug -DGIT_HASH=1.30 -GNinja -DGEN_GRADLE=On
+set CMAKE_BUILD_CMD=cmake -DBUILD_ANDROID=On -DANDROID_BUILD_TOOLS_VERSION=29.0.2 -DCMAKE_BUILD_TYPE=Debug -DGIT_HASH=1.36 -DBRANCH_DEV=On -GNinja -DGEN_GRADLE=On
 
 rem 设置 abi 数组
 set abis[0]=x86

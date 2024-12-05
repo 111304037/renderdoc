@@ -19,6 +19,7 @@ android {
         externalNativeBuild {
             cmake {
                 abiFilters rootProject.ext.abiFilters.split(",")
+                arguments "-DBRANCH_DEV=On"
             }
         }
     }

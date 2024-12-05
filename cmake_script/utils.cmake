@@ -4,6 +4,8 @@
 my_set_target_folder(test "Test")
 ]]
 
+set(VS_INSTALL_PATH "@VS_INSTALL_PATH@")
+
 # place a target inside of an IDE filter
 set_property(GLOBAL PROPERTY USE_FOLDERS OFF)
 # can't place those targets in custom folder, so increasing visibility by placing them  in the top level
@@ -42,6 +44,30 @@ function(assign_source_group)
     endforeach()
 endfunction(assign_source_group)
  
+
+macro(add_win32_definitions)
+	if(WIN32)
+		set(defs
+			UNICODE _UNICODE
+			_WINDOWS
+			WIN32
+			WIN64
+			RENDERDOC_PLATFORM_WIN32
+			SCINTILLA_QT=1
+			MAKING_LIBRARY=1
+			SCI_LEXER=1
+			QT_NO_CAST_FROM_ASCII
+			QT_NO_CAST_TO_ASCII
+			QT_WIDGETS_LIB
+			QT_GUI_LIB
+			QT_CORE_LIB
+			QT_SVG_LIB
+		)
+		foreach(def ${defs})
+			add_definitions(-D${def})
+		endforeach()
+	endif()
+endmacro()
 
 macro(add_common_definitions)
 	if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -99,7 +125,6 @@ macro(add_common_definitions)
 		foreach(def ${defs})
 			add_definitions(-Wno-${def})
 		endforeach()
-		message(FATAL_ERROR, "[+]add_definitions -wno")
 	endif()
 	if(BRANCH_DEV)
 		add_definitions(-DBRANCH_DEV=1)

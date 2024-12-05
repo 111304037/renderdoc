@@ -15,7 +15,7 @@ list(REMOVE_DUPLICATES source_cpp_list)
 include_directories(${include_dires})
 
 #使用unicode字符集
-add_definitions(-DUNICODE -D_UNICODE)
+add_win32_definitions()
 
 build_library(rdoc_d3d12 OBJECT ${source_cpp_list})
 target_compile_definitions(rdoc_d3d12 ${RDOC_DEFINITIONS})
