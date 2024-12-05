@@ -27,6 +27,52 @@
 #include <replay/renderdoc_replay.h>
 #include "cmdline/cmdline.h"
 
+#if BRANCH_DEV
+#if ANDROID
+#include <android/log.h>
+
+#define LOG_TAG "renderdoccmd"
+FILE * GetLogFile();
+template <typename... Args>
+void writeLog(Args... args)
+{
+  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, args...);
+  FILE *logFile = GetLogFile();
+  if(logFile != nullptr){
+    //va_list marker;
+    //va_start(marker, format);
+    //fprintf(logFile, format, marker);
+    //va_end(marker);
+    fprintf(logFile, args...);
+    fprintf(logFile, "\n");
+    fflush(logFile);
+  }
+}
+
+    #if 0
+    #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+    #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+    #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+    #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+    #define ANDROID_LOG(...) __android_log_print(ANDROID_LOG_INFO, "renderdoccmd", __VA_ARGS__);
+    #else
+    #define LOGD(...) writeLog(__VA_ARGS__);
+    #define LOGI(...) writeLog(__VA_ARGS__);
+    #define LOGW(...) writeLog(__VA_ARGS__);
+    #define LOGE(...) writeLog(__VA_ARGS__);
+    #define LOGF(...) writeLog(__VA_ARGS__);
+    #define ANDROID_LOG(...) writeLog(__VA_ARGS__);
+    #endif
+#else
+    #define LOGD(...) printf(__VA_ARGS__);
+    #define LOGI(...) printf(__VA_ARGS__);
+    #define LOGW(...) printf(__VA_ARGS__);
+    #define LOGE(...) printf(__VA_ARGS__);
+    #define LOGF(...) printf(__VA_ARGS__);
+    #define ANDROID_LOG(...) printf(__VA_ARGS__);
+#endif
+#endif
+
 struct Command
 {
   virtual ~Command() {}

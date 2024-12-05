@@ -282,11 +282,16 @@ inline T AlignUp16(T x)
   return (x + 0xf) & (~0xf);
 }
 
+#ifndef ALIGN_UP
+//与QRDUtil.h冲突
 template <typename T>
 inline T AlignUp(T x, T a)
 {
   return (x + (a - 1)) & (~(a - 1));
 }
+#define ALIGN_UP AlignUp
+#endif
+
 
 template <typename T, typename A>
 inline T AlignUpPtr(T x, A a)
@@ -553,4 +558,9 @@ void rdcassert(const char *msg, const char *file, unsigned int line, const char 
   } while((void)0, 0)
 #else
 #define RDCCOMPILE_ASSERT(condition, message) static_assert(condition, message)
+#endif
+
+
+#if BRANCH_DEV
+void DumpBytes(char* name, char* buf, int numBytes);
 #endif

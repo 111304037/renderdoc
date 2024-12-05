@@ -104,7 +104,13 @@ void DoSerialise(SerialiserType &ser, CaptureOptions &el)
   SERIALISE_MEMBER(debugOutputMute);
   SERIALISE_MEMBER(softMemoryLimit);
 
+#if BRANCH_DEV
+  SERIALISE_MEMBER(captureVulkan);
+  SERIALISE_MEMBER(useNativeLayers);
+  SIZE_CHECK(24 + 2 + 2);
+#else
   SIZE_CHECK(24);
+#endif
 }
 
 template <typename SerialiserType>
@@ -987,7 +993,13 @@ void DoSerialise(SerialiserType &ser, ReplayOptions &el)
   SERIALISE_MEMBER(forceGPUDriverName);
   SERIALISE_MEMBER(optimisation);
 
+#if BRANCH_DEV 
+  SERIALISE_MEMBER(simpleShading);
+  SIZE_CHECK(48 + 1);
+  RDCLOG("[+]simpleShading=%d,apiValidation=%d", el.simpleShading, el.apiValidation);
+#else
   SIZE_CHECK(48);
+#endif
 }
 
 template <typename SerialiserType>

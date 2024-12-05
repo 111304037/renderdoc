@@ -554,6 +554,11 @@ static rdcarray<rdcstr> ParseCommandLine(const rdcstr &appName, const rdcstr &cm
 static pid_t RunProcess(rdcstr appName, rdcstr workDir, const rdcstr &cmdLine, char **envp,
                         bool pauseAtMain, int stdoutPipe[2] = NULL, int stderrPipe[2] = NULL)
 {
+  
+  RDCLOG("RunProcess appName=%s,workDir=%s,cmdLine=%s", 
+    appName.c_str(), workDir.c_str(), cmdLine.c_str()
+  );
+  
   if(appName.empty())
     return (pid_t)0;
 
@@ -584,6 +589,8 @@ static pid_t RunProcess(rdcstr appName, rdcstr workDir, const rdcstr &cmdLine, c
   appName = shellExpand(appName);
   workDir = shellExpand(workDir);
 
+  RDCLOG("[*]appName=%s,workDir=%s", appName.c_str(), workDir.c_str());
+
   rdcarray<rdcstr> argvList = ParseCommandLine(appName, cmdLine);
 
   if(argvList.empty())
@@ -595,6 +602,8 @@ static pid_t RunProcess(rdcstr appName, rdcstr workDir, const rdcstr &cmdLine, c
   argv[argvList.size()] = NULL;
 
   const rdcstr appPath(GetAbsoluteAppPathFromName(appName));
+
+  RDCLOG("[*]appPath=%s", appPath.c_str());
 
   pid_t childPid = 0;
 
@@ -689,6 +698,7 @@ uint32_t Process::LaunchProcess(const rdcstr &app, const rdcstr &workingDir, con
     return 0;
   }
 
+  //RDCLOG("LaunchProcess app:%s, cmdLine:%s", app.c_str(), cmdLine.c_str());
   int stdoutPipe[2], stderrPipe[2];
   if(result)
   {
@@ -1050,6 +1060,16 @@ void *Process::GetFunctionAddress(void *module, const rdcstr &function)
 
   return dlsym(module, function.c_str());
 }
+
+#if BRANCH_DEV
+void *Process::GetOriginFunctionAddress(void *module, const rdcstr &function)
+{
+  if(module == NULL)
+    return NULL;
+
+  return dlsym(module, function.c_str());
+}
+#endif
 
 uint32_t Process::GetCurrentPID()
 {

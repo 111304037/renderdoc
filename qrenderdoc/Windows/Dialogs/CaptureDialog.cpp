@@ -931,6 +931,12 @@ void CaptureDialog::SetSettings(CaptureSettings settings)
   ui->AutoStart->setChecked(settings.autoStart);
   ui->SoftMemoryLimit->setValue(settings.options.softMemoryLimit);
 
+#if BRANCH_DEV
+  ui->CaptureVulkan->setChecked(settings.options.captureVulkan);
+  ui->UseNativeLayers->setChecked(settings.options.useNativeLayers);
+  //qInfo() << QFormatStr("CaptureOptions size=%1\n").arg(sizeof(CaptureOptions));
+#endif
+
   // force flush this state
   on_CaptureCallstacks_toggled(ui->CaptureCallstacks->isChecked());
 
@@ -978,6 +984,11 @@ CaptureSettings CaptureDialog::Settings()
   ret.options.delayForDebugger = (uint32_t)ui->DelayForDebugger->value();
   ret.options.verifyBufferAccess = ui->VerifyBufferAccess->isChecked();
   ret.options.softMemoryLimit = (uint32_t)ui->SoftMemoryLimit->value();
+
+#if BRANCH_DEV
+  ret.options.captureVulkan = ui->CaptureVulkan->isChecked();
+  ret.options.useNativeLayers = ui->UseNativeLayers->isChecked();
+#endif
 
   if(ui->queueFrameCap->isChecked())
   {

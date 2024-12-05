@@ -26,6 +26,9 @@
 #include <errno.h>
 #include "api/replay/stringise.h"
 #include "common/timing.h"
+#if BRANCH_DEV && ENABLED(RDOC_ANDROID)
+#include <android/Debug/cpp/callstack.hpp>
+#endif
 
 Compressor::~Compressor()
 {
@@ -145,6 +148,9 @@ StreamReader::StreamReader(FILE *file)
 {
   if(file == NULL)
   {
+#if BRANCH_DEV && ENABLED(RDOC_ANDROID)
+      CDebug::backtraceToLogcat();
+#endif
     SET_ERROR_RESULT(m_Error, ResultCode::InvalidParameter,
                      "Stream created with invalid file handle");
     m_InputSize = 0;
@@ -379,6 +385,9 @@ bool StreamReader::ReadLargeBuffer(void *buffer, uint64_t length)
   return ret;
 }
 
+/*
+读取数据
+*/
 bool StreamReader::ReadFromExternal(void *buffer, uint64_t length)
 {
   bool success = true;
@@ -423,8 +432,8 @@ bool StreamReader::ReadFromExternal(void *buffer, uint64_t length)
 
       // we expect to be reading into our window buffer
       RDCASSERT(readDest >= m_BufferBase && readDest <= m_BufferBase + m_BufferSize);
-
-      success = m_Sock->RecvDataBlocking(readDest, (uint32_t)length);
+      success = m_Sock->RecvDataBlocking(readDest, (uint32_t)length);//接收第一部分
+      //RDCLOG("[io]RecvDataBlocking:success=%d, length=%d", success, length);
 
       if(success)
       {
@@ -439,8 +448,10 @@ bool StreamReader::ReadFromExternal(void *buffer, uint64_t length)
           RDCERR("Invalid read in ReadFromExternal!");
         }
 
+        //RDCLOG("[io]RecvDataNonBlocking:bufSize=%d", bufSize);
         // now read more, as much as possible, to try and batch future reads
-        success = m_Sock->RecvDataNonBlocking(readDest, bufSize);
+        success = m_Sock->RecvDataNonBlocking(readDest, bufSize);//接收剩余数据
+        //RDCLOG("[io]RecvDataNonBlocking:success=%d, bufSize=%d", success, bufSize);
 
         if(success)
           m_InputSize += bufSize;
@@ -838,7 +849,7 @@ bool StreamWriter::SendSocketData(const void *data, uint64_t numBytes)
 {
   // try to coalesce small writes without doing blocking sends, at least until we're flushed.
   // if the buffer is already full, flush it.
-  if(m_BufferHead + numBytes >= m_BufferEnd)
+  if(m_BufferHead + numBytes >= m_BufferEnd)//空间不足，发送缓存
   {
     bool success = FlushSocketData();
     if(!success)
@@ -846,7 +857,7 @@ bool StreamWriter::SendSocketData(const void *data, uint64_t numBytes)
   }
 
   // if it's larger than our buffer (even after flushing) just write directly
-  if(m_BufferHead + numBytes >= m_BufferEnd)
+  if(m_BufferHead + numBytes >= m_BufferEnd)//太大，直接发送
   {
     bool success = m_Sock->SendDataBlocking(data, (uint32_t)numBytes);
     if(!success)
@@ -859,7 +870,7 @@ bool StreamWriter::SendSocketData(const void *data, uint64_t numBytes)
       return false;
     }
   }
-  else
+  else//放入缓存
   {
     // otherwise, write it into the in-memory buffer
     memcpy(m_BufferHead, data, (size_t)numBytes);

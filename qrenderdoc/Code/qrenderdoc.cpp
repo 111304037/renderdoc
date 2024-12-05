@@ -193,7 +193,11 @@ int main(int argc, char *argv[])
   // an optimisation
   qputenv("QT_NO_SUBTRACTOPAQUESIBLINGS", lit("1").toUtf8());
 
+#if BRANCH_DEV
   qInfo() << "QRenderDoc initialising.";
+#else
+  qInfo() << "QRenderDoc initialising.version=" << QT_VERSION;
+#endif
 
   if(IsRunningAsAdmin())
     qInfo() << "Running as administrator";
@@ -212,8 +216,27 @@ int main(int argc, char *argv[])
   }
 #endif
 
+#if BRANCH_DEV
   QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QGuiApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#else
+  #if 1
+    //http://www.cleartechfei.com/2020/05/qt%E7%A8%8B%E5%BA%8F%E9%80%82%E9%85%8D%E9%AB%98%E5%88%86%E8%BE%A8%E7%8E%87/
+  #if(QT_VERSION >= QT_VERSION_CHECK(5, 9, 0))
+    QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
+  #endif
+  #else
+    //支持高Dpi的接口，可以让界面随着dpi的变化进行缩放
+    QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    QGuiApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);//控制图片缩放质量
+
+    //这个是Windows平台用来获取屏幕宽度的代码，因为在qApplication实例初始化之前，QGuiApplication::screens();无法使用。
+    qreal cx = GetSystemMetrics(SM_CXSCREEN);
+    qreal cy = GetSystemMetrics(SM_CYSCREEN);
+    qreal scale = cy / cx;
+    qputenv("QT_SCALE_FACTOR", QString::number(scale).toLatin1());
+  #endif
+#endif
 
 #if(QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(

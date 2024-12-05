@@ -69,6 +69,9 @@ private slots:
   // automatic slots
   void on_showUnused_toggled(bool checked);
   void on_showEmpty_toggled(bool checked);
+#if BRANCH_DEV
+  void on_revert_simple_shading_toggled(bool checked);
+#endif
 
   void on_meshView_clicked();
   void on_msMeshButton_clicked();
@@ -142,6 +145,9 @@ private:
 
   bool m_ShowUnused = false;
   bool m_ShowEmpty = false;
+#if BRANCH_DEV
+  bool m_RevertSimpleShading = false;
+#endif
 
   void exportHTML(QXmlStreamWriter &xml, const VKPipe::VertexInput &vi);
   void exportHTML(QXmlStreamWriter &xml, const VKPipe::InputAssembly &ia);

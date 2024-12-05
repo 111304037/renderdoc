@@ -1,3 +1,7 @@
+if(BRANCH_DEV AND GEN_GRADLE)
+    #use gradle build
+    include(renderdoccmd_android.cmake)
+else()
 set(sources
     renderdoccmd.cpp
     renderdoccmd.h
@@ -68,11 +72,27 @@ elseif(UNIX)
     # Make sure that for the target executable we don't throw away
     # any shared libraries.
     set(LINKER_FLAGS "-Wl,--no-as-needed")
+elseif(BRANCH_DEV AND WIN32)
+    include(renderdocshim.cmake)
+    #使用unicode字符集
+    add_definitions(-DUNICODE -D_UNICODE)
+    list(APPEND sources 
+        renderdoccmd_win32.cpp
+        3rdparty/cmdline/cmdline.h
+        ../renderdoc/3rdparty/miniz/miniz.h
+        ../renderdoc/3rdparty/miniz/miniz.c
+    )
+    list(APPEND includes 
+        ../renderdoc/3rdparty
+        ../renderdocshim
+        ../renderdoc/api/replay
+    )
+    list(APPEND libraries PRIVATE rdoc_version)
 endif()
 
 if(ANDROID)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINKER_FLAGS}")
-    add_library(renderdoccmd SHARED ${sources})
+    build_library(renderdoccmd SHARED ${sources})
 else()
     set(CMAKE_SKIP_BUILD_RPATH TRUE)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -84,7 +104,12 @@ else()
     endif()
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LINKER_FLAGS}")
 
+    if(BRANCH_DEV AND WIN32)
+    build_executable(renderdoccmd ${sources})
+    my_set_target_folder(renderdoccmd "Utility")
+    else()
     add_executable(renderdoccmd ${sources})
+    endif()
     
     if(INTERNAL_SELF_CAPTURE)
         set_target_properties(renderdoccmd PROPERTIES OUTPUT_NAME "rdocselfcmd")
@@ -309,4 +334,5 @@ if(ANDROID)
                        COMMAND ${BUILD_TOOLS}/apksigner${TOOL_SCRIPT_EXTENSION} sign --ks ${KEYSTORE} --ks-pass pass:android --key-pass pass:android --ks-key-alias rdocandroidkey RenderDocCmd.apk
                        COMMAND ${CMAKE_COMMAND} -E copy RenderDocCmd.apk ${APK_FILE})
 
+endif()
 endif()

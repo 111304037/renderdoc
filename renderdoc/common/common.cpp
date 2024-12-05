@@ -289,10 +289,25 @@ void rdclog_filename(const char *filename)
 
   if(!logfile->empty())
   {
+#if BRANCH_DEV
+//    int i = logfile->find_last_of("/");
+//    if(i >= 0){
+//      rdcstr log_root = logfile->substr(0, i);
+//      RDCLOG("log_root:%s", log_root.c_str());
+//      FileIO::CreateParentDirectory(log_root);
+//    }
+    FileIO::CreateParentDirectory(*logfile);
+#endif
     logfileHandle = FileIO::logfile_open(*logfile);
+#if BRANCH_DEV
+    RDCLOG("[*]logfile:%s", logfile->c_str());
+#endif
 
     if(logfileHandle && !previous.empty())
     {
+#if BRANCH_DEV
+      RDCLOG("change logfile previous:%s, cur:%s", previous.c_str(),logfile->c_str());
+#endif
       rdcstr previousContents;
       FileIO::ReadAll(previous, previousContents);
 
@@ -538,3 +553,15 @@ void rdclog_direct(time_t utcTime, uint32_t pid, LogType type, const char *proje
 
   SAFE_DELETE_ARRAY(oversizedBuffer);
 }
+
+
+#if BRANCH_DEV
+void DumpBytes(char* name, char* buf, int numBytes) {
+
+    std::string msg;
+    for (int i = 0; i < numBytes; i++) {
+        msg += std::string(" ") + std::to_string(*(buf + i));
+    }
+    RDCLOG("%s:%s", name, msg.c_str());
+}
+#endif

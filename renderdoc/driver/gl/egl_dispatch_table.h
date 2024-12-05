@@ -68,6 +68,12 @@ typedef PFNEGLPOSTSUBBUFFERNVPROC PFN_eglPostSubBufferNV;
 typedef PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC PFN_eglSwapBuffersWithDamageEXT;
 typedef PFNEGLSWAPBUFFERSWITHDAMAGEKHRPROC PFN_eglSwapBuffersWithDamageKHR;
 
+#if BRANCH_DEV
+//华为
+typedef EGLClientBuffer (APIENTRYP *PFN_eglGetNativeClientBufferANDROID)(const struct AHardwareBuffer *buffer);
+typedef EGLImageKHR (APIENTRYP *PFN_eglCreateImageKHR)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list);
+#endif
+
 #define EGL_HOOKED_SYMBOLS(FUNC)                   \
   FUNC(BindAPI, false, true);                      \
   FUNC(GetProcAddress, false, true);               \
@@ -84,7 +90,7 @@ typedef PFNEGLSWAPBUFFERSWITHDAMAGEKHRPROC PFN_eglSwapBuffersWithDamageKHR;
   FUNC(SwapBuffersWithDamageEXT, true, false);     \
   FUNC(SwapBuffersWithDamageKHR, true, false);
 
-#define EGL_NONHOOKED_SYMBOLS(FUNC)        \
+#define BASE_EGL_NONHOOKED_SYMBOLS(FUNC)        \
   FUNC(ChooseConfig, false, true);         \
   FUNC(CreatePbufferSurface, false, true); \
   FUNC(DestroySurface, false, true);       \
@@ -97,6 +103,20 @@ typedef PFNEGLSWAPBUFFERSWITHDAMAGEKHRPROC PFN_eglSwapBuffersWithDamageKHR;
   FUNC(QueryAPI, false, true);             \
   FUNC(QuerySurface, false, true);         \
   FUNC(QueryContext, false, true);
+
+
+#if BRANCH_DEV
+#define NEW_EGL_NONHOOKED_SYMBOLS(FUNC)        \
+  BASE_EGL_NONHOOKED_SYMBOLS(FUNC)              \
+  /*华为*/                                 \
+  FUNC(GetNativeClientBufferANDROID, false, true);\
+  FUNC(CreateImageKHR, false, true);
+
+#define EGL_NONHOOKED_SYMBOLS NEW_EGL_NONHOOKED_SYMBOLS
+#else
+#define EGL_NONHOOKED_SYMBOLS BASE_EGL_NONHOOKED_SYMBOLS
+#endif
+
 
 struct EGLDispatchTable
 {

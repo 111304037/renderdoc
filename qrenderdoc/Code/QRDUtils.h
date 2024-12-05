@@ -46,11 +46,19 @@
 
 class QHeaderView;
 
+#if BRANCH_DEV
+#ifndef ALIGN_UP
+//与common.h冲突
+#endif
 template <typename T>
 inline T AlignUp(T x, T a)
 {
   return (x + (a - 1)) & (~(a - 1));
 }
+#if BRANCH_DEV
+#define ALIGN_UP AlignUp
+#endif
+#endif
 
 #ifndef ARRAY_COUNT
 #define ARRAY_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))

@@ -61,6 +61,6 @@ llvm_map_components_to_libnames(interceptor_general_libs
 
 set(interceptor_libs z ${interceptor_arch_libs} ${interceptor_general_libs} PARENT_SCOPE)
 
-add_library(interceptor_lib OBJECT
+build_library(interceptor_lib OBJECT
     ${sources})
 

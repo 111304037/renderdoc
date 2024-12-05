@@ -132,7 +132,30 @@
    <item row="3" column="1">
     <widget class="QComboBox" name="replayOptimisation"/>
    </item>
-   <item row="4" column="0" colspan="2">
+   
+   <item row="4" column="0">
+    <widget class="QLabel" name="label_row_5">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="text">
+      <string>Use Simple Shader on Shading:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QCheckBox" name="replaySimpleShading">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+
+
+   <item row="5" column="0" colspan="2">
     <widget class="QFrame" name="buttonsFrame">
      <layout class="QHBoxLayout" name="buttonsLayout">
       <property name="leftMargin">
@@ -184,6 +207,8 @@
      </layout>
     </widget>
    </item>
+
+
   </layout>
  </widget>
  <resources/>

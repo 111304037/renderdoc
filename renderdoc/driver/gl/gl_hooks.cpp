@@ -220,7 +220,8 @@ void *HookedGetProcAddress(const char *func, void *realFunc)
 
   // for any other function, if it's not a core or extension function we know about,
   // return the real function pointer as this may be something internal
-  RDCDEBUG("Returning real pointer for entirely unknown function '%s': %p", func, realFunc);
+  //三星上可能在ui线程调用会导致闪退
+  //RDCDEBUG("Returning real pointer for entirely unknown function '%s': %p", func, realFunc);
 
   return realFunc;
 }

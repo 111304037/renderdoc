@@ -30,6 +30,11 @@
 #include "common/formatting.h"
 #include "os/os_specific.h"
 
+#if BRANCH_DEV
+#include "api/replay/replay_enums.h"
+#endif
+
+
 #ifndef WSA_FLAG_NO_HANDLE_INHERIT
 #define WSA_FLAG_NO_HANDLE_INHERIT 0x80
 #endif
@@ -159,7 +164,11 @@ Socket *Socket::AcceptClient(uint32_t timeoutMilliseconds)
       BOOL nodelay = TRUE;
       setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (const char *)&nodelay, sizeof(nodelay));
 
+#if BRANCH_DEV
+      return new Socket((ptrdiff_t)s, StringFormat::Fmt("AcceptClient_%d", (int)s));
+#else
       return new Socket((ptrdiff_t)s);
+#endif
     }
 
     int err = WSAGetLastError();
@@ -366,6 +375,9 @@ bool Socket::RecvDataBlocking(void *buf, uint32_t length)
 
 Socket *CreateServerSocket(const rdcstr &bindaddr, uint16_t port, int queuesize)
 {
+#if BRANCH_DEV
+  RDCDEBUG("CreateServerSocket %s:%d,queuesize=%d", bindaddr.c_str(), port, queuesize);
+#endif
   SOCKET s = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
                        WSA_FLAG_NO_HANDLE_INHERIT | WSA_FLAG_OVERLAPPED);
 
@@ -398,7 +410,11 @@ Socket *CreateServerSocket(const rdcstr &bindaddr, uint16_t port, int queuesize)
   u_long nonblock = 1;
   ioctlsocket(s, FIONBIO, &nonblock);
 
+#if BRANCH_DEV
+  return new Socket((ptrdiff_t)s, StringFormat::Fmt("server_%s:%d", bindaddr.c_str(), port));
+#else
   return new Socket((ptrdiff_t)s);
+#endif
 }
 
 Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
@@ -490,7 +506,11 @@ Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
 
     FreeAddrInfoW(addrResult);
 
+#if BRANCH_DEV
+    return new Socket((ptrdiff_t)s, StringFormat::Fmt("client_%s:%d", host, port));
+#else
     return new Socket((ptrdiff_t)s);
+#endif
   }
 
   FreeAddrInfoW(addrResult);

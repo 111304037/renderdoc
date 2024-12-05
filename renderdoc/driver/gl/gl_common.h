@@ -2241,6 +2241,10 @@ enum class GLChunk : uint32_t
   glFlushMappedBufferRangeEXT,
   glClipControlEXT,
 
+#if BRANCH_DEV
+  //华为
+  glEGLImageTargetTexture2DOES,
+#endif
   Max,
 };
 

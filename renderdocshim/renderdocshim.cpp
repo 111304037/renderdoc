@@ -46,17 +46,20 @@ typedef void(__cdecl *pINTERNAL_SetDebugLogFile)(const char *logfile);
   } while(0)
 #else
 // define this to something to get logging
-// #define LOGPRINT(txt) OutputDebugStringW(txt)
+#define LOGPRINT(txt) OutputDebugStringW(txt)
+#ifndef LOGPRINT
 #define LOGPRINT(txt) \
   do                  \
   {                   \
   } while(0)
+#endif    // !LOGPRINT
+
 #endif
 
 void CheckHook()
 {
   ShimData *data = NULL;
-
+  //创建共享的内存空间
   HANDLE datahandle = OpenFileMappingA(FILE_MAP_READ, FALSE, GLOBAL_HOOK_DATA_NAME);
 
   if(datahandle == NULL)
@@ -64,7 +67,7 @@ void CheckHook()
     LOGPRINT(L"renderdocshim: can't open global data\n");
     return;
   }
-
+  //获取内存映射到该程序的内存，可以进行读写操作
   data = (ShimData *)MapViewOfFile(datahandle, FILE_MAP_READ, 0, 0, sizeof(ShimData));
 
   if(data == NULL)
@@ -104,13 +107,15 @@ void CheckHook()
 
     if(find >= 0)
     {
+      //MessageBoxA(0, data->capfile, "renderdocshim", MB_SYSTEMMODAL);
+      //MessageBoxA(0, data->debuglog, "renderdocshim", MB_SYSTEMMODAL);
       LOGPRINT(L"renderdocshim: Hooking into '");
       LOGPRINT(exepath);
       LOGPRINT(L"', based on '");
       LOGPRINT(data->pathmatchstring);
       LOGPRINT(L"'\n");
 
-      HMODULE mod = LoadLibraryW(data->rdocpath);
+      HMODULE mod = LoadLibraryW(data->rdocpath);//renderdoc.dll
 
       if(mod)
       {
@@ -125,7 +130,7 @@ void CheckHook()
           setopts((const CaptureOptions *)data->opts);
 
         if(setlogfile && data->capfile[0])
-          setlogfile(data->capfile);
+          setlogfile(data->capfile);//user/temp/renderdoc/xxx.rdc
 
         if(setdebuglog && data->debuglog[0])
           setdebuglog(data->debuglog);
@@ -164,6 +169,7 @@ DWORD CheckHookThread(LPVOID param)
 
 BOOL APIENTRY dll_entry(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
+  LOGPRINT(L"renderdocshim: dll_entry");
   if(ul_reason_for_call == DLL_PROCESS_ATTACH)
   {
     DisableThreadLibraryCalls(hModule);
@@ -174,4 +180,14 @@ BOOL APIENTRY dll_entry(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpRese
   }
 
   return TRUE;
+}
+
+extern "C" LRESULT __declspec(dllexport) GetMsgProc(int code, WPARAM wParam, LPARAM lParam);
+// 钩子回调函数
+LRESULT GetMsgProc(int code, WPARAM wParam, LPARAM lParam)
+{
+  MessageBoxA(0, "Hello world!2", "TestLoader1111", MB_SYSTEMMODAL);
+  OutputDebugStringA("[AppInitHook] main()");
+
+  return ::CallNextHookEx(NULL, code, wParam, lParam);
 }

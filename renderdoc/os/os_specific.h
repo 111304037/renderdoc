@@ -41,12 +41,24 @@
 #include "api/replay/rdcstr.h"
 #include "common/globalconfig.h"
 #include "common/result.h"
+#if BRANCH_DEV
+#include <string>
+#include <algorithm>
+#include "api/replay/apidefs.h"
+#endif
 
 struct CaptureOptions;
 struct EnvironmentModification;
 struct PathEntry;
 enum class WindowingSystem : uint32_t;
 typedef std::function<void(float)> RENDERDOC_ProgressCallback;
+
+
+#if BRANCH_DEV
+#if ENABLED(RDOC_WIN32)
+std::string get_last_error(int errCode);
+#endif
+#endif
 
 namespace Process
 {
@@ -85,6 +97,9 @@ rdcpair<RDResult, uint32_t> LaunchAndInjectIntoProcess(const rdcstr &app, const 
 bool IsModuleLoaded(const rdcstr &module);
 void *LoadModule(const rdcstr &module);
 void *GetFunctionAddress(void *module, const rdcstr &function);
+#if BRANCH_DEV
+void *GetOriginFunctionAddress(void *module, const rdcstr &function);
+#endif
 uint32_t GetCurrentPID();
 
 void Shutdown();
@@ -181,7 +196,17 @@ namespace Network
 class Socket
 {
 public:
+#if BRANCH_DEV
+  Socket(ptrdiff_t s, rdcstr name) 
+  : socket(s)
+  , timeoutMS(1000 * 60) 
+  ,m_name(name)
+  {
+  }
+#else
   Socket(ptrdiff_t s) : socket(s), timeoutMS(5000) {}
+#endif
+
   ~Socket();
   void Shutdown();
 
@@ -189,7 +214,19 @@ public:
 
   RDResult GetError() const { return m_Error; }
   uint32_t GetTimeout() const { return timeoutMS; }
+#if BRANCH_DEV
+  void SetTimeout(uint32_t milliseconds) {
+      const uint32_t t = 1000 * 60 * 3;
+      if (milliseconds > t) {
+          timeoutMS = milliseconds;
+      }
+      else {
+          timeoutMS = t;
+      }
+  }
+#else
   void SetTimeout(uint32_t milliseconds) { timeoutMS = milliseconds; }
+#endif
   Socket *AcceptClient(uint32_t timeoutMilliseconds);
 
   uint32_t GetRemoteIP() const;
@@ -200,7 +237,19 @@ public:
   bool RecvDataBlocking(void *data, uint32_t length);
   bool RecvDataNonBlocking(void *data, uint32_t &length);
 
+#if BRANCH_DEV
+  rdcstr GetName(){
+    return this->m_name;
+  }
+  rdcstr Tag() {
+      return this->m_name;
+  }
+#endif
+
 private:
+#if BRANCH_DEV
+  rdcstr m_name;
+#endif
   ptrdiff_t socket;
   uint32_t timeoutMS;
   RDResult m_Error;

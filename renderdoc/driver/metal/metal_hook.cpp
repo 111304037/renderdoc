@@ -29,7 +29,7 @@ static MetalHook metalhook;
 
 static void MetalHooked(void *handle)
 {
-  RDCDEBUG("Metal library hooked");
+  RDCDEBUG("[+]Metal library hooked");
 
   // store the handle for any pass-through implementations that need to look up their onward
   // pointers
@@ -38,7 +38,7 @@ static void MetalHooked(void *handle)
   // as a hook callback this is only called while capturing
   RDCASSERT(!RenderDoc::Inst().IsReplayApp());
 
-  MetalHook::RegisterGlobalNonHookedMetalFunctions();
+  MetalHook::RegisterGlobalNonHookedMetalFunctions();//metal_hook_bridge.mm开始hook函数
 }
 
 void MetalHook::RegisterHooks()

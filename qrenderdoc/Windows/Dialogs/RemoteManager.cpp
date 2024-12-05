@@ -214,6 +214,11 @@ void RemoteManager::runRemoteServer(RDTreeWidgetItem *node)
 void RemoteManager::refreshHost(RDTreeWidgetItem *node)
 {
   RemoteHost host = getRemoteHost(node);
+#if BRANCH_DEV
+  /*if (host.Hostname().find("adb") < 0) {
+      return;
+  }*/
+#endif
 
   if(!host.IsValid())
     return;
@@ -235,6 +240,7 @@ void RemoteManager::refreshHost(RDTreeWidgetItem *node)
 
     uint32_t nextIdent = 0;
 
+    //枚举host下的app
     for(;;)
     {
       // just a sanity check to make sure we don't hit some unexpected case and infinite loop
@@ -272,6 +278,11 @@ void RemoteManager::refreshHost(RDTreeWidgetItem *node)
 
         conn->Shutdown();
       }
+#if BRANCH_DEV
+      else {
+          qInfo() << "not conn, port=" << nextIdent;
+      }
+#endif
     }
 
     GUIInvoke::call(this, [node]() { node->setItalic(false); });

@@ -416,6 +416,7 @@ RenderDoc::RenderDoc()
 
 void RenderDoc::Initialise()
 {
+  RDCLOG("[+]RenderDoc::Initialise()");
   Callstack::Init();
 
   Network::Init();
@@ -439,6 +440,10 @@ void RenderDoc::Initialise()
 
     Process::ApplyEnvironmentModification();
 
+#if BRANCH_DEV && SOCKET_THREAD
+    //优化下线程逻辑
+    m_RemoteThread = Threading::CreateThread([this]() { TargetControlServerThread(this); });
+#else
     uint32_t port = RenderDoc_FirstTargetControlPort;
 
     Network::Socket *sock = Network::CreateServerSocket("0.0.0.0", port & 0xffff, 4);
@@ -468,6 +473,7 @@ void RenderDoc::Initialise()
     {
       RDCWARN("Couldn't open socket for target control");
     }
+#endif
   }
 
   // set default capture log - useful for when hooks aren't setup
@@ -483,6 +489,7 @@ void RenderDoc::Initialise()
       SetCaptureFileTemplate(capture_filename);
 
     RDCLOGFILE(m_LoggingFilename.c_str());
+    RDCLOG("[+]core.cpp log:%s", m_LoggingFilename.c_str());
   }
 
   const char *platform =
@@ -1351,11 +1358,13 @@ void RenderDoc::QueueCapture(uint32_t frameNumber)
 
 bool RenderDoc::ShouldTriggerCapture(uint32_t frameNumber)
 {
+  //指定数量
   bool ret = m_Cap > 0;
 
   if(m_Cap > 0)
     m_Cap--;
 
+  //指定帧
   rdcarray<uint32_t> frames;
   frames.swap(m_QueuedFrameCaptures);
   for(auto it = frames.begin(); it != frames.end(); ++it)
@@ -1839,8 +1848,13 @@ RDResult RenderDoc::CreateRemoteDriver(RDCFile *rdc, const ReplayOptions &opts, 
                       ToStr(driverType).c_str());
 }
 
+/*
+添加活动的图形api
+*/
 void RenderDoc::AddActiveDriver(RDCDriver driver, bool present)
 {
+  //RDCLOG("AddActiveDriver:%d", driver);
+  //CALLSTACK_DUMP();
   if(driver == RDCDriver::Unknown)
     return;
 

@@ -619,6 +619,26 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QCheckBox" name="CaptureVulkan">
+        <property name="toolTip">
+         <string>Capture Vulkan</string>
+        </property>
+        <property name="text">
+         <string>Capture Vulkan</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="UseNativeLayers">
+        <property name="toolTip">
+         <string>Use NativeLayers</string>
+        </property>
+        <property name="text">
+         <string>Use NativeLayers</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

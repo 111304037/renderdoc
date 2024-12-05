@@ -25,6 +25,10 @@
 
 #pragma once
 
+#if BRANCH_DEV
+#define SOCKET_THREAD 1
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <map>
@@ -107,6 +111,26 @@ struct IFrameCapturer
 
 struct IDeviceProtocolHandler;
 
+/*
+LoadingReplaying：
+正在加载和重放初始资源的状态，用于进行一次性的分析工作，例如记录操作细节、跟踪资源使用和操作类型的统计信息，
+以及创建后续活动重放所需的资源。在这个状态结束后，进入 ActiveReplaying 状态，一直持续到关闭捕捉。
+
+ActiveReplaying：
+重放活动状态，用于分析整个或部分重放帧的性能数据，不进行重量级的加载过程。
+
+StructuredExport：
+结构化导出状态，用于序列化数据而不进行任何处理，用于将帧捕捉的结构化数据导出到其他格式，而无需初始化 API。
+
+BackgroundCapturing：
+后台捕捉状态，表示已注入程序进行捕捉，但当前没有正在捕捉的帧。在注入程序后，立即进入此状态，只进行最少量的
+必要工作，以准备稍后进行帧捕捉。当触发帧捕捉时，立即转换到 ActiveCapturing 状态，在该状态下保留，直到成功
+捕捉帧，然后转换回该状态，以继续在后台捕捉必要的工作以进行进一步的帧捕捉。
+
+ActiveCapturing：
+正在捕捉帧状态，表示正在进行帧捕捉的状态，从后台捕捉状态转换而来，在帧捕捉开始时立即进入此状态，直到捕捉完
+成后转换回 BackgroundCapturing 状态。
+*/
 // In most cases you don't need to check these individually, use the utility functions below
 // to determine if you're in a capture or replay state. There are utility functions for each
 // state as well.
@@ -714,7 +738,11 @@ private:
   uint64_t m_TimeBase;
   double m_TimeFrequency;
 
+#if BRANCH_DEV && SOCKET_THREAD
+    static void TargetControlServerThread(RenderDoc *rdoc);
+#else
   static void TargetControlServerThread(Network::Socket *sock);
+#endif
   static void TargetControlClientThread(uint32_t version, Network::Socket *client);
 
   ICrashHandler *m_ExHandler;

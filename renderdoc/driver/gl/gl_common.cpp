@@ -1333,6 +1333,10 @@ GLenum BufferEnum(size_t idx)
   return eGL_NONE;
 }
 
+/*
+gl_driver.h
+m_TextureRecord[12][256];
+*/
 size_t TextureIdx(GLenum buf)
 {
   switch(buf)
@@ -1354,6 +1358,11 @@ size_t TextureIdx(GLenum buf)
     case eGL_TEXTURE_CUBE_MAP_NEGATIVE_Z: return 8;
     case eGL_TEXTURE_CUBE_MAP_ARRAY: return 9;
     case eGL_TEXTURE_BUFFER: return 10;
+#if BRANCH_DEV
+    case eGL_TEXTURE_EXTERNAL_OES:
+        //RDCERR("Unexpected enum as texture target: %s, 是否动画、视频播放等外部纹理?", ToStr(buf).c_str());
+        return 11;
+#endif
     default: RDCERR("Unexpected enum as texture target: %s", ToStr(buf).c_str());
   }
 

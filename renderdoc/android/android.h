@@ -38,7 +38,11 @@ Process::ProcessResult adbExecCommand(const rdcstr &deviceID, const rdcstr &args
                                       const rdcstr &workDir = ".", bool silent = false);
 void initAdb();
 void shutdownAdb();
+#if BRANCH_DEV
+bool InjectWithJDWP(const rdcstr &deviceID, uint16_t jdwpport, rdcstr RDCLib, const CaptureOptions& opts);
+#else
 bool InjectWithJDWP(const rdcstr &deviceID, uint16_t jdwpport);
+#endif
 
 struct LogcatThread
 {

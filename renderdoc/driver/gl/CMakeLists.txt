@@ -1,3 +1,8 @@
+
+if(BRANCH_DEV)
+add_common_definitions()
+endif()
+
 set(sources
     gl_common.cpp
     gl_common.h
@@ -61,6 +66,19 @@ if(APPLE)
         cgl_platform.cpp
         cgl_hooks.cpp)
 else()
+
+if(BRANCH_DEV AND WIN32)
+    if(ENABLE_GL)
+        #使用unicode字符集
+        add_definitions(-DUNICODE -D_UNICODE)        
+        list(APPEND sources
+            official/wglext.h
+            wgl_dispatch_table.h
+            wgl_platform.cpp
+            wgl_hooks.cpp
+        )
+    endif()
+else()
     if(ENABLE_GL)
         list(APPEND sources
             official/glxext.h
@@ -69,6 +87,8 @@ else()
             glx_hooks.cpp
             glx_fake_vk_hooks.cpp)
     endif()
+endif()
+
     if(ENABLE_GLES)
         list(APPEND sources
             official/glesext.h)
@@ -84,6 +104,11 @@ else()
     endif()
 endif()
 
+if(BRANCH_DEV)
+build_library(rdoc_gl OBJECT ${sources})
+my_set_target_folder(rdoc_gl "DLL/drivers/RHI")
+else()
 add_library(rdoc_gl OBJECT ${sources})
+endif()
 target_compile_definitions(rdoc_gl ${RDOC_DEFINITIONS})
 target_include_directories(rdoc_gl ${RDOC_INCLUDES})

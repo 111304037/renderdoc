@@ -35,9 +35,51 @@
 
 #include <android_native_app_glue.h>
 
+#if BRANCH_DEV
+FILE *logFile = nullptr;
+const char* GetLogFilename(const char* name){
+  JNIEnv *env;
+  android_state->activity->vm->AttachCurrentThread(&env, 0);
+
+  jobject me = android_state->activity->clazz;
+
+  jclass acl = env->GetObjectClass(me);    // class pointer of NativeActivity
+
+  jmethodID get_external_dir = env->GetMethodID(acl, "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
+  //jstring type = env->NewStringUTF(name); // NULL表示获取应用程序的根私有目录
+  jobject external_dir = env->CallObjectMethod(me, get_external_dir, nullptr);
+  jclass file_class = env->FindClass("java/io/File");
+  jmethodID get_path = env->GetMethodID(file_class, "getPath", "()Ljava/lang/String;");
+  jstring jpath = (jstring)env->CallObjectMethod(external_dir, get_path);
+  const char *path = env->GetStringUTFChars(jpath, 0);
+  android_state->activity->vm->DetachCurrentThread();
+  std::string tmpStr = std::string(path);
+  tmpStr = tmpStr+ "/" + std::string(name);
+  path = tmpStr.c_str();
+  return path;
+}
+
+FILE * GetLogFile(){
+  if(android_state == nullptr){
+    return nullptr;
+  }
+  if(logFile == nullptr)
+  {
+    const char* filename = GetLogFilename("RenderdoCmd.log");
+      __android_log_print(ANDROID_LOG_INFO, "renderdoccmd", "logfile:%s",filename);
+      //logFile = fopen("/mnt/sdcard/RenderdoCmd.log", "w+,ccs=UTF-8");
+      logFile = fopen(filename, "w+,ccs=UTF-8");
+      //char header[3] = {0xef, 0xbb, 0xbf};
+      //fwrite(header, sizeof(char), 3, logFile);
+      //fprintf(logFile, "中文\n");
+  }
+  return logFile;
+}
+#else
 #include <android/log.h>
 #define ANDROID_LOG(...) __android_log_print(ANDROID_LOG_INFO, "renderdoccmd", __VA_ARGS__);
 
+#endif
 struct android_app *android_state;
 pthread_t cmdthread_handle = 0;
 
@@ -81,6 +123,7 @@ float curtime()
   return float(ts.tv_sec) + float(ts.tv_nsec & 0xffffffff) / 1000000000.0f;
 }
 
+//region 显示splash
 void DisplayGenericSplash()
 {
   ANDROID_LOG("Trying to splash");
@@ -335,6 +378,7 @@ void main()
   m_DrawLock.unlock();
   ANDROID_LOG("Done splashing");
 }
+//endregion
 
 WindowingData DisplayRemoteServerPreview(bool active, const rdcarray<WindowingSystem> &systems)
 {
@@ -435,6 +479,7 @@ std::vector<std::string> getRenderdoccmdArgs()
   return ret;
 }
 
+//cmd线程
 void *cmdthread(void *)
 {
   std::vector<std::string> args = getRenderdoccmdArgs();
@@ -443,6 +488,7 @@ void *cmdthread(void *)
     ANDROID_LOG("Entering cmd thread");
     m_CmdLock.lock();
     GlobalEnvironment env;
+    //启动RendocCmd
     renderdoccmd(env, args);
     m_CmdLock.unlock();
     ANDROID_LOG("Exiting cmd thread");
@@ -454,14 +500,16 @@ void *cmdthread(void *)
   return NULL;
 }
 
+//执行指令
 void handle_cmd(android_app *app, int32_t cmd)
 {
   ANDROID_LOG("handle_cmd(%i)", cmd);
   switch(cmd)
   {
+    //启动cmd线程
     case APP_CMD_INIT_WINDOW:
     {
-      ANDROID_LOG("APP_CMD_INIT_WINDOW");
+      ANDROID_LOG("[>]APP_CMD_INIT_WINDOW(1)");
       // if we already have a thread handle, see if it's still running
       if(cmdthread_handle != 0)
       {
@@ -497,9 +545,16 @@ void handle_cmd(android_app *app, int32_t cmd)
       DisplayGenericSplash();
       break;
     }
+#if BRANCH_DEV
+    default:
+    {
+      ANDROID_LOG("[>]ignore cmd");
+    }break;
+#endif
   }
 }
 
+//app入口
 void android_main(struct android_app *state)
 {
   android_state = state;

@@ -35,6 +35,15 @@
 #include "strings/string_utils.h"
 #include "android_utils.h"
 
+#if BRANCH_DEV
+static bool IsSpaceChar(char c) {
+    if (c >= 0 && c <= 255)
+      return isspace(c);
+    return true;
+}
+#define isspace IsSpaceChar
+#endif
+
 RDOC_CONFIG(uint32_t, Android_MaxConnectTimeout, 30,
             "Maximum time in seconds to try connecting to the target app before giving up. "
             "Useful primarily for apps that take a very long time to start up.");
@@ -47,6 +56,38 @@ namespace Android
 void adbForwardPorts(uint16_t portbase, const rdcstr &deviceID, uint16_t jdwpPort, int pid,
                      bool silent)
 {
+#if BRANCH_DEV
+  /*
+  android_network.cpp创建的是创建本地抽象域套接字
+  CreateServerSocket->CreateAbstractServerSocket
+  */
+    //adb forward <local> <remote>
+  //const char *forwardCommand = "forward tcp:%i localabstract:renderdoc_%i";
+  const char* forwardCommand = "forward tcp:%i tcp:%i";
+
+  rdcstr forwardCmd;
+  //renderdoccmd server
+  forwardCmd = StringFormat::Fmt(
+      forwardCommand, 
+      portbase + RenderDoc_ForwardRemoteServerOffset,
+      RenderDoc_RemoteServerPort
+  );
+  adbExecCommand(deviceID, forwardCmd, ".", silent);
+  //app
+  for (int i = 0,iMax= RenderDoc_LastTargetControlPort - RenderDoc_FirstTargetControlPort; i < iMax; i++)
+  {
+      /*
+      adbExecCommand(deviceID, StringFormat::Fmt(
+          "forward --remove tcp:%i",
+          RenderDoc_FirstTargetControlPort + i), ".", silent);
+      */
+      forwardCmd = StringFormat::Fmt(
+          forwardCommand, 
+          portbase + RenderDoc_ForwardTargetControlOffset + i, 
+          RenderDoc_FirstTargetControlPort + i);
+      adbExecCommand(deviceID, forwardCmd, ".", silent);
+  }
+#else
   const char *forwardCommand = "forward tcp:%i localabstract:renderdoc_%i";
 
   adbExecCommand(deviceID,
@@ -57,6 +98,7 @@ void adbForwardPorts(uint16_t portbase, const rdcstr &deviceID, uint16_t jdwpPor
                  StringFormat::Fmt(forwardCommand, portbase + RenderDoc_ForwardTargetControlOffset,
                                    RenderDoc_FirstTargetControlPort),
                  ".", silent);
+#endif
 
   if(jdwpPort && pid)
     adbExecCommand(deviceID, StringFormat::Fmt("forward tcp:%hu jdwp:%i", jdwpPort, pid));
@@ -470,6 +512,7 @@ RDResult InstallRenderDocServer(const rdcstr &deviceID)
 
   if(apksFolder.empty())
   {
+    RDCERR("%s.apk not found!", apk.c_str());
 #if RENDERDOC_OFFICIAL_BUILD
     RETURN_ERROR_RESULT(ResultCode::AndroidAPKFolderNotFound,
                         "RenderDoc APK not found. Your build of RenderDoc may be incomplete.\n"
@@ -1276,8 +1319,15 @@ struct AndroidController : public IDeviceProtocolHandler
     if(srcPort == RenderDoc_RemoteServerPort)
       return portbase + RenderDoc_ForwardRemoteServerOffset;
     // we only support a single target control connection on android
+#if BRANCH_DEV
+    else if (srcPort >= RenderDoc_FirstTargetControlPort && srcPort <= RenderDoc_LastTargetControlPort) {
+        int offset = srcPort - RenderDoc_FirstTargetControlPort;
+        return portbase + RenderDoc_ForwardTargetControlOffset + offset;
+    }
+#else
     else if(srcPort == RenderDoc_FirstTargetControlPort)
       return portbase + RenderDoc_ForwardTargetControlOffset;
+#endif
 
     return 0;
   }
@@ -1377,7 +1427,11 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
 
     rdcstr info;
 
+#if BRANCH_DEV
+    if(opts.useNativeLayers && Android::SupportsNativeLayers(m_deviceID))
+#else
     if(Android::SupportsNativeLayers(m_deviceID))
+#endif
     {
       RDCLOG("Using Android 10 native GPU layering");
 
@@ -1404,6 +1458,17 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
       }
       else
       {
+#if BRANCH_DEV
+        // if(installedABI == "x86")
+        // {
+        //   installedABI = "armeabi-v7a";
+        //   RDCLOG("android.cpp: correct abi x86 => armeabi-v7a");
+        // }else if(installedABI == "x86_64")
+        // {
+        //   installedABI  = "arm64-v8a";
+        //   RDCLOG("GetSupportedABIs: correct abi x86_64 => arm64-v8a");
+        // }
+#endif
         abi = Android::GetABI(installedABI);
       }
 
@@ -1440,12 +1505,48 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
         checkString.push_back(c);
       }
 
+#if BRANCH_DEV
+      if (!checkString.contains("enable_gpu_debug_layers=1")) {
+
+          hookWithJDWP = true;
+          RDCERR("[-]enable_gpu_debug_layers=1 false");
+
+      }else if(!checkString.contains("gpu_debug_app=" + packageName)) {
+
+          hookWithJDWP = true;
+          RDCERR("[-]gpu_debug_app=%s", packageName.c_str());
+      }
+      else if (!checkString.contains("gpu_debug_layer_app=" + layerPackage)) {
+
+          hookWithJDWP = true;
+          RDCERR("[-]gpu_debug_layer_app=%s", layerPackage.c_str());
+      }
+      else if (!checkString.contains("gpu_debug_layers=" RENDERDOC_VULKAN_LAYER_NAME)) {
+
+          hookWithJDWP = true;
+          RDCERR("[-]gpu_debug_layers=%s", RENDERDOC_VULKAN_LAYER_NAME);
+      }
+      else if (!checkString.contains("gpu_debug_layers_gles=" RENDERDOC_ANDROID_LIBRARY))
+      {
+          hookWithJDWP = true;
+          RDCERR("[-]gpu_debug_layers_gles=%s", RENDERDOC_ANDROID_LIBRARY);
+      }
+      if(hookWithJDWP){
+/*
+报错信息：
+java.lang.SecurityException: Permission denial: writing to settings requires:android.permission.WRITE_SECURE_SETTINGS
+解决办法：
+小米：在开发者选项里，把“USB调试（安全设置）"打开即可。  允许USB调试修改权限或模拟点击
+oppo：在开发者选项里，把"禁止权限监控"打开即可。
+*/
+#else
       if(!checkString.contains("enable_gpu_debug_layers=1") ||
          !checkString.contains("gpu_debug_app=" + packageName) ||
          !checkString.contains("gpu_debug_layer_app=" + layerPackage) ||
          !checkString.contains("gpu_debug_layers=" RENDERDOC_VULKAN_LAYER_NAME) ||
          !checkString.contains("gpu_debug_layers_gles=" RENDERDOC_ANDROID_LIBRARY))
       {
+#endif
         info =
             "Do you have a strange device that requires extra setup?\n"
             "E.g. Xiaomi requires a developer account and \"USB debugging (Security Settings)\"\n";
@@ -1459,6 +1560,12 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
         // working.
         Android::adbExecCommand(m_deviceID, "shell setprop debug.rdoc.IGNORE_LAYERS 1");
       }
+#if BRANCH_DEV
+      else{
+        
+        RDCLOG("Using Android 10 native GPU layering:%s",checkString.c_str());
+      }
+#endif
     }
 
     if(hookWithJDWP)
@@ -1496,6 +1603,10 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
                                             "\" /sdcard/Android/" + folderName + processName +
                                             "/files/renderdoc.conf");
 
+//查找apk里是否内置lib
+#if BRANCH_DEV
+#if USE_BUILTIN_LIB
+#endif
     rdcstr installedPath = Android::GetPathForPackage(m_deviceID, packageName);
 
     rdcstr RDCLib = Android::adbExecCommand(m_deviceID, "shell ls " + installedPath +
@@ -1524,9 +1635,16 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
     }
     else
     {
+#if !BRANCH_DEV
       hookWithJDWP = false;
+#endif
       RDCLOG("Library found, no injection required: %s", RDCLib.c_str());
     }
+#if BRANCH_DEV
+#else
+    rdcstr RDCLib = "";
+#endif
+#endif
 
     int pid = 0;
 
@@ -1544,7 +1662,7 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
     }
     else
     {
-      RDCLOG("Launching APK with no debugger or direct injection.");
+      RDCLOG("[*]Launching APK with no debugger or direct injection(Whithout JDWP).");
 
       // start the activity in this package with debugging enabled and force-stop after starting
       Android::adbExecCommand(
@@ -1585,7 +1703,11 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
     if(jdwpPort)
     {
       // use a JDWP connection to inject our libraries
+#if BRANCH_DEV
+      bool injected = Android::InjectWithJDWP(m_deviceID, jdwpPort, RDCLib, opts);
+#else
       bool injected = Android::InjectWithJDWP(m_deviceID, jdwpPort);
+#endif
       if(!injected)
       {
         RDCERR("Failed to inject using JDWP");
@@ -1614,6 +1736,11 @@ ExecuteResult AndroidRemoteServer::ExecuteAndInject(const rdcstr &packageAndActi
         result = ResultCode::Succeeded;
         break;
       }
+#if BRANCH_DEV
+      else {
+          RDCLOG("[*]wait for control:%s",(AndroidController::m_Inst.GetProtocolName() + "://" + m_deviceID).c_str());
+      }
+#endif
 
       // check to see if the PID is still there. If it was before and isn't now, the APK has
       // exited

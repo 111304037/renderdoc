@@ -1,4 +1,30 @@
 cmake_minimum_required(VERSION 2.8.12)
+option(BRANCH_DEV "is branch dev" OFF)
+option(GEN_GRADLE "gen gradle project" OFF)
+if(BRANCH_DEV)
+    include(cmake_script/utils.cmake)
+    if(WIN32)
+        #add_compile_options(-bigobj)
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+        
+        #如果不加_DEBUG，会自动在路径后面添加Debug/Relase
+        #默认生成文件目录
+        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/bin)
+        #设置可执行文件的输出路径
+        SET(EXECUTABLE_OUTPUT_PATH_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/bin)
+        #静态库 lib 输出路径
+        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/libs)
+
+        # #pyconfig.h引用了python_d.lib需要改下
+        # #https://blog.csdn.net/frank_liuxing/article/details/74010939
+        # set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
+        # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MD")
+
+    endif()
+    add_common_definitions()
+endif()
+
+
 
 if(APPLE)
   # Building for Apple requires at least CMake 3.23.0
@@ -244,13 +270,19 @@ if(ENABLE_UNSUPPORTED_EXPERIMENTAL_POSSIBLY_BROKEN_WAYLAND)
     endif()
 endif()
 
+if(NOT BRANCH_DEV)
 if(WIN32)
     message(FATAL_ERROR "CMake is not needed on Windows, just open and build renderdoc.sln")
+endif()
 endif()
 
 message(STATUS "Calculating version")
 
+if(BRANCH_DEV)
+file(READ ${CMAKE_CURRENT_LIST_DIR}/renderdoc/api/replay/version.h VERSION_CONTENTS)
+else()
 file(READ ${CMAKE_SOURCE_DIR}/renderdoc/api/replay/version.h VERSION_CONTENTS)
+endif()
 
 string(REGEX MATCH "_MAJOR [0-9]+" MAJOR_VERSION_LINE "${VERSION_CONTENTS}")
 string(REGEX MATCH "[0-9]+" RENDERDOC_VERSION_MAJOR "${MAJOR_VERSION_LINE}")
@@ -310,8 +342,11 @@ if(ENABLE_GLES AND NOT ENABLE_EGL)
     message(FATAL_ERROR "EGL is required for GLES")
 endif()
 
+if(NOT ANDROID)
+#gradle
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+endif()
 
 if(APPLE)
     # For Xcode set the output directory to be the same for all configurations
@@ -464,12 +499,80 @@ elseif(UNIX)
     endif()
 endif()
 
+if(BRANCH_DEV)
+    if(WIN32)
+        add_definitions(
+            -DRDOC_DLL_FILE=${RDOC_BASE_NAME}
+            -DRENDERDOC_PLATFORM_WIN32)
+        if(ENABLE_XLIB)
+            add_definitions(-DRENDERDOC_WINDOWING_XLIB)
+        endif()
+
+        if(ENABLE_XCB)
+            add_definitions(-DRENDERDOC_WINDOWING_XCB)
+        endif()
+
+        if(ENABLE_WAYLAND)
+            add_definitions(-DRENDERDOC_WINDOWING_WAYLAND)
+        endif()
+    endif()
+    if(NOT GEN_GRADLE)
+        add_subdirectory(renderdoc)
+    endif()
+else()
 add_subdirectory(renderdoc)
+endif()
 
 # these variables are handled within the CMakeLists.txt in qrenderdoc,
 # but we need to add it if either is enabled since the swig bindings
 # are handled in common
 if(ENABLE_QRENDERDOC OR ENABLE_PYRENDERDOC)
+    if(BRANCH_DEV)
+        if(WIN32)
+            set(PYTHON_EXECUTABLE )
+            set(PYTHON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/qrenderdoc/3rdparty/python/include)
+            IF(CMAKE_CL_64)
+                set(PYTHON_LIBRARY ${CMAKE_SOURCE_DIR}/qrenderdoc/3rdparty/python/x64/python36.lib)
+                set(PYTHON_DLL ${CMAKE_SOURCE_DIR}/qrenderdoc/3rdparty/python/x64/python36.dll)
+            ELSE(CMAKE_CL_64)
+                set(PYTHON_LIBRARY ${CMAKE_SOURCE_DIR}/qrenderdoc/3rdparty/python/Win32/python36.lib)
+                set(PYTHON_DLL ${CMAKE_SOURCE_DIR}/qrenderdoc/3rdparty/python/Win32/python36.dll)
+            ENDIF(CMAKE_CL_64)
+            message("PYTHON_LIBRARY:${PYTHON_LIBRARY}")
+            message("PYTHON_DLL:${PYTHON_DLL}")
+        else()
+            # Make sure Python 3 is found
+            set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5 3.4)
+            if(NOT ${CMAKE_VERSION} VERSION_LESS "3.12")
+                find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+                set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+                set(PYTHON_LIBRARY ${Python3_LIBRARIES})
+                set(PYTHON_INCLUDE_DIR ${Python3_INCLUDE_DIRS})
+                set(PythonLibs_FOUND ${Python3_FOUND})
+                set(PYTHON_VERSION_MINOR ${Python3_VERSION_MINOR})
+
+                message("PYTHON_EXECUTABLE:${PYTHON_EXECUTABLE}")
+                message("PYTHON_LIBRARY:${PYTHON_LIBRARY}")
+                message("PYTHON_INCLUDE_DIR:${PYTHON_INCLUDE_DIR}")
+                message("PythonLibs_FOUND:${PythonLibs_FOUND}")
+                message("PYTHON_VERSION_MINOR:${PYTHON_VERSION_MINOR}")
+            else()
+                find_package(PythonInterp 3 REQUIRED)
+                find_package(PythonLibs 3 REQUIRED)
+            endif()
+
+            message("Python3_EXECUTABLE:${Python3_EXECUTABLE}")
+            message("Python3_LIBRARIES:${Python3_LIBRARIES}")
+            message("Python3_INCLUDE_DIRS:${Python3_INCLUDE_DIRS}")
+
+            # we also need python3-config for swig, but it's only for the examples
+            # so it doesn't matter which one we find as long as we find something!
+            # Importantly it doesn't have to match the version we link against
+            if(NOT EXISTS "${PYTHON_EXECUTABLE}-config" AND NOT EXISTS "${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config")
+                message(FATAL_ERROR "We require ${PYTHON_EXECUTABLE}-config or ${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config to build swig, please install the python dev package for your system.")
+            endif()
+        endif()
+    else()
     # Make sure Python 3 is found
     set(Python_ADDITIONAL_VERSIONS 3.12 3.11 3.10 3.9 3.8 3.7 3.6 3.5 3.4)
     if(NOT ${CMAKE_VERSION} VERSION_LESS "3.12")
@@ -490,6 +593,7 @@ if(ENABLE_QRENDERDOC OR ENABLE_PYRENDERDOC)
     if(NOT EXISTS "${PYTHON_EXECUTABLE}-config" AND NOT EXISTS "${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config")
         message(FATAL_ERROR "We require ${PYTHON_EXECUTABLE}-config or ${PYTHON_EXECUTABLE}.${PYTHON_VERSION_MINOR}-config to build swig, please install the python dev package for your system.")
     endif()
+    endif() #BRANCH_DEV
 
     add_subdirectory(qrenderdoc)
 endif()

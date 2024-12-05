@@ -49,8 +49,17 @@ uint32_t Socket::GetRemoteIP() const
   return MakeIP(127, 0, 0, 1);
 }
 
+#if BRANCH_DEV
+Socket *CreateServerSocket(const rdcstr &bindaddr, uint16_t port, int queuesize)
+{
+  //return CreateAbstractServerSocket(port, queuesize);
+  return CreateTCPServerSocket(bindaddr, port, queuesize);
+}
+#else
 Socket *CreateServerSocket(const rdcstr &, uint16_t port, int queuesize)
 {
   return CreateAbstractServerSocket(port, queuesize);
 }
+#endif
+
 };

@@ -191,6 +191,11 @@ CaptureOptions::CaptureOptions()
   captureAllCmdLists = false;
   debugOutputMute = true;
   softMemoryLimit = 0;
+
+#if BRANCH_DEV
+  captureVulkan = true;
+  useNativeLayers = true;
+#endif
 }
 
 #if ENABLED(ENABLE_UNIT_TESTS)

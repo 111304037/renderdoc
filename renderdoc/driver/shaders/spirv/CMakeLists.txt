@@ -93,6 +93,11 @@ if(UNIX)
         ${glslang_dir}/glslang/OSDependent/Unix/ossource.cpp)
 endif()
 
+if(BRANCH_DEV AND WIN32)
+    list(APPEND glslang_sources
+        ${glslang_dir}/glslang/OSDependent/Windows/ossource.cpp)
+endif()
+
 set(sources
     glslang_compile.cpp
     glslang_compile.h
@@ -120,8 +125,10 @@ set(sources
 add_definitions(-DAMD_EXTENSIONS)
 add_definitions(-DNV_EXTENSIONS)
 
+if(NOT MSVC)
 set_property(SOURCE ${glslang_sources}
     PROPERTY COMPILE_FLAGS "-Wno-ignored-qualifiers -Wno-strict-aliasing -Wno-unreachable-code-break")
+endif()
 
 # GCC 7.0 and above needs -Wno-implicit-fallthrough
 if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 6.9)
@@ -146,6 +153,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     endif()
 endif()
 
-add_library(rdoc_spirv OBJECT ${sources})
+build_library(rdoc_spirv OBJECT ${sources})
 target_compile_definitions(rdoc_spirv ${RDOC_DEFINITIONS})
 target_include_directories(rdoc_spirv ${RDOC_INCLUDES} ${glslang_dir})
+my_set_target_folder(rdoc_spirv "DLL/drivers/shaders")

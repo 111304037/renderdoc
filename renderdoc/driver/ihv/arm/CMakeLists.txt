@@ -50,14 +50,21 @@ else()
     )
 endif()
 
+if(BRANCH_DEV AND NOT MSVC)
 set_property(SOURCE ${sources}
     PROPERTY COMPILE_FLAGS "-Wno-unknown-warning-option -Wno-range-loop-construct")
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set_property(SOURCE ${sources} APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-shadow -Wno-shorten-64-to-32")
 endif()
 
+if(BRANCH_DEV)
+build_library(rdoc_arm OBJECT ${sources})
+my_set_target_folder(rdoc_arm "DLL/drivers/RHI")
+else()
 add_library(rdoc_arm OBJECT ${sources})
+endif()
 
 set(include_dirs
     ${RDOC_INCLUDES}

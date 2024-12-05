@@ -86,6 +86,9 @@ ReplayOptionsSelector::ReplayOptionsSelector(ICaptureContext &ctx, bool actions,
 
     ui->replayAPIValidation->setChecked(opts.apiValidation);
     ui->replayOptimisation->setCurrentIndex((int)opts.optimisation);
+#if !BRANCH_DEV
+    ui->replaySimpleShading->setChecked(opts.simpleShading);
+#endif
 
     int bestIndex = -1;
 
@@ -165,6 +168,9 @@ ReplayOptions ReplayOptionsSelector::options()
 
   opts.apiValidation = ui->replayAPIValidation->isChecked();
   opts.optimisation = (ReplayOptimisationLevel)ui->replayOptimisation->currentIndex();
+#if !BRANCH_DEV
+  opts.simpleShading = ui->replaySimpleShading->isChecked();
+#endif
 
   int gpuChoice = ui->gpuOverride->currentIndex();
   if(gpuChoice > 0 && gpuChoice - 1 < m_GPUs.count())

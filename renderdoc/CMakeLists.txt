@@ -1,5 +1,9 @@
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(BRANCH_DEV)
+set(RDOC_MODULE renderdoc)
+endif()
+
 set(RDOC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(RDOC_DEFINITIONS PRIVATE -DRENDERDOC_EXPORTS)
 set(RDOC_INCLUDES
@@ -302,6 +306,15 @@ if(ANDROID)
         os/posix/posix_stringio.cpp
         os/posix/posix_threading.cpp
         os/posix/posix_specific.h)
+if(BRANCH_DEV)
+    list(APPEND sources 
+        #debug
+        android/Debug/callstack.c
+        android/Debug/callstack.h
+        android/Debug/cpp/callstack.cpp
+        android/Debug/cpp/callstack.hpp
+    )
+endif()
 elseif(APPLE)
     list(APPEND sources
         data/embedded_files.h
@@ -352,6 +365,26 @@ elseif(UNIX)
         os/posix/posix_stringio.cpp
         os/posix/posix_threading.cpp
         os/posix/posix_specific.h)
+elseif(BRANCH_DEV AND WIN32)
+    set(search_paths
+        ${CMAKE_CURRENT_LIST_DIR}/os/win32
+    )
+    set(source_cpp_list)
+    get_source_cpp_list(source_cpp_list ${search_paths})
+
+    set(data_res)
+    file(GLOB_RECURSE data_res ${CMAKE_CURRENT_LIST_DIR}/data/*.rc)
+    #EXCLUDE_FILES(${data_res} GLOB_RECURSE *.hlsl)
+
+    #FILE( GLOB_RECURSE data_res *.rc *.comp *.frag *.vert *.h *.c*)
+    message("data_res:${data_res}")
+
+    list(APPEND sources
+        os/win32/comexport.def
+        core/precompiled.cpp
+        core/precompiled.h
+        ${data_res}
+        ${source_cpp_list})
 endif()
 
 if(NOT ANDROID)
@@ -364,6 +397,8 @@ if(NOT ANDROID)
         3rdparty/compressonator/BC6_Encode_kernel.cpp
         3rdparty/compressonator/BC7_Encode_Kernel.cpp)
 
+    if(BRANCH_DEV)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set_source_files_properties(3rdparty/compressonator/BC1_Encode_kernel.cpp
         3rdparty/compressonator/BC2_Encode_kernel.cpp
         3rdparty/compressonator/BC3_Encode_kernel.cpp
@@ -372,6 +407,8 @@ if(NOT ANDROID)
         3rdparty/compressonator/BC6_Encode_kernel.cpp
         3rdparty/compressonator/BC7_Encode_Kernel.cpp
         PROPERTIES COMPILE_FLAGS "-D_LINUX -Wno-newline-eof -Wno-missing-braces -Wno-char-subscripts -Wno-sign-compare -Wno-unused-value -Wno-strict-aliasing -Wno-shift-negative-value -Wno-implicit-fallthrough")
+    endif()
+    endif()
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
@@ -485,7 +522,32 @@ if(UNIX)
     # assume is present) directly to build the binary
 
     if(CMAKE_CROSSCOMPILING)
+        if(BRANCH_DEV)
+            if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+                # 执行 vswhere 命令，查询 Visual Studio 安装路径
+                # execute_process(
+                #     COMMAND vswhere.exe -latest -property installationPath
+                #     OUTPUT_VARIABLE VS_INSTALL_PATH
+                #     OUTPUT_STRIP_TRAILING_WHITESPACE
+                # )
+                
+                set(VS_INSTALL_PATH "C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise")
+                # 提取 VsDevCmd.bat 文件的路径
+                set(VSDEV_CMD_PATH "${VS_INSTALL_PATH}/Common7/Tools/VsDevCmd.bat")
+                
+                # 检查文件是否存在
+                if(EXISTS "${VSDEV_CMD_PATH}")
+                    message("VsDevCmd.bat found at ${VSDEV_CMD_PATH}")
+                else()
+                    message(FATAL_ERROR "VsDevCmd.bat not found:${VSDEV_CMD_PATH}")
+                endif()
+                set(HOST_NATIVE_CPP_COMPILER ${VSDEV_CMD_PATH} && cl.exe /Zi /EHsc /Fe:${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin.exe)
+            else()
+                set(HOST_NATIVE_CPP_COMPILER c++ CACHE STRING "Command to run to compile a .cpp into an executable. Default is just c++")
+            endif()
+        else()
         set(HOST_NATIVE_CPP_COMPILER c++ CACHE STRING "Command to run to compile a .cpp into an executable. Default is just c++")
+        endif()
 
         add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -495,7 +557,11 @@ if(UNIX)
         set(INCLUDE_BIN_EXE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
         set(INCLUDE_BIN_DEP "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/include-bin")
     else()
+        if(BRANCH_DEV)
+        build_executable(include-bin 3rdparty/include-bin/main.cpp)
+        else()
         add_executable(include-bin 3rdparty/include-bin/main.cpp)
+        endif()
         set(INCLUDE_BIN_EXE $<TARGET_FILE:include-bin>)
         set(INCLUDE_BIN_DEP include-bin)
     endif()
@@ -540,6 +606,36 @@ if(ENABLE_GL OR ENABLE_GLES OR ENABLE_VULKAN)
     add_subdirectory(driver/shaders/spirv)
     list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_spirv>)
 endif()
+
+if(BRANCH_DEV AND WIN32)
+    list(APPEND sources data/hlsl/hlsl_cbuffers.h
+        data/hlsl/hlsl_custom_prefix.h
+        data/hlsl/hlsl_texsample.h
+    )
+    add_subdirectory(driver/shaders/dxil)
+    add_subdirectory(driver/shaders/dxbc)
+    add_subdirectory(driver/d3d11)
+    add_subdirectory(driver/d3d12)
+    add_subdirectory(driver/dxgi)
+    list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_dxbc>)
+    list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_dxil>)
+    list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_d3d11>)
+    list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_d3d12>)
+    list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_dxgi>)
+    #添加预编译头
+    if(ENABLE_VULKAN)
+        target_precompile_headers(rdoc_vulkan PRIVATE driver/vulkan/precompiled.h)
+    endif()
+    if(ENABLE_GL OR ENABLE_GLES)
+        target_precompile_headers(rdoc_gl PRIVATE driver/gl/precompiled.h)
+    endif()
+    list(APPEND RDOC_LIBRARIES PRIVATE 
+        Setupapi.lib 
+        ws2_32.lib
+        Shlwapi.lib
+    )
+endif()
+
 
 option(USE_INTERCEPTOR_LIB OFF)
 
@@ -590,7 +686,28 @@ if(ENABLE_GL OR ENABLE_GLES OR ENABLE_VULKAN)
     list(APPEND renderdoc_objects $<TARGET_OBJECTS:rdoc_nv>)
 endif()
 
+if(BRANCH_DEV)
+    message("---------------build_library rdoc---------------")
+    message("RDOC_INCLUDES:${RDOC_INCLUDES}")
+    if(WIN32)
+        #使用unicode字符集
+        add_definitions(-DUNICODE -D_UNICODE)
+        if(CMAKE_CL_64)
+            list(APPEND RDOC_DEFINITIONS PRIVATE -DWIN64)
+        else()
+            list(APPEND RDOC_DEFINITIONS PRIVATE -DWIN32)
+        endif()
+        build_library(rdoc STATIC ${sources})
+        #添加预编译头
+        #target_precompile_headers(rdoc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/core/precompiled.h)
+        my_set_target_folder(rdoc "DLL")
+    else()
+        build_library(rdoc OBJECT ${sources})
+    endif()
+else()
 add_library(rdoc OBJECT ${sources})
+endif()
+
 target_compile_definitions(rdoc ${RDOC_DEFINITIONS})
 target_include_directories(rdoc ${RDOC_INCLUDES})
 
@@ -598,17 +715,24 @@ list(APPEND renderdoc_objects
     $<TARGET_OBJECTS:rdoc>
     ${data_objects})
 
+if(BRANCH_DEV)
+    build_library(rdoc_version OBJECT replay/version.cpp)
+    target_compile_definitions(rdoc_version ${RDOC_DEFINITIONS})
+    my_set_target_folder(rdoc_version "DLL")
+else()
 add_library(rdoc_version OBJECT replay/version.cpp)
+endif()
 target_compile_definitions(rdoc_version PRIVATE -DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
 
 list(APPEND renderdoc_objects
     $<TARGET_OBJECTS:rdoc_version>)
 
+if(NOT BRANCH_DEV OR NOT WIN32)
 # posix_libentry must be the last so that library_loaded is called after
 # static objects are constructed. We guarantee this happens after even
 # any other static libraries that we link by making it its own static
 # library and appending it to the end of the link list.
-add_library(renderdoc_libentry STATIC os/posix/posix_libentry.cpp)
+build_library(renderdoc_libentry STATIC os/posix/posix_libentry.cpp)
 target_compile_definitions(renderdoc_libentry ${RDOC_DEFINITIONS})
 target_include_directories(renderdoc_libentry ${RDOC_INCLUDES})
 link_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -620,16 +744,33 @@ if(APPLE)
 else()
     list(APPEND RDOC_LIBRARIES PRIVATE -lrenderdoc_libentry)
 endif()
+endif()
 
+if(BRANCH_DEV)
+    message("RDOC_LIBRARIES:${RDOC_LIBRARIES}")
+    build_library(${RDOC_MODULE} SHARED ${renderdoc_objects})
+    target_compile_definitions(${RDOC_MODULE} ${RDOC_DEFINITIONS})
+    target_include_directories(${RDOC_MODULE} ${RDOC_INCLUDES})
+    target_link_libraries(${RDOC_MODULE} ${RDOC_LIBRARIES})
+    my_set_target_folder(${RDOC_MODULE} "DLL")
+    if(NOT WIN32)
+        add_dependencies(${RDOC_MODULE} renderdoc_libentry)
+    endif()
+else()
 add_library(renderdoc SHARED ${renderdoc_objects})
 target_compile_definitions(renderdoc ${RDOC_DEFINITIONS})
 target_include_directories(renderdoc ${RDOC_INCLUDES})
 target_link_libraries(renderdoc ${RDOC_LIBRARIES})
 
 add_dependencies(renderdoc renderdoc_libentry)
+endif()
 
 if(UNIX AND NOT ANDROID AND NOT APPLE)
+    if(BRANCH_DEV)
+    set(RDOC_LINK_FLAGS "-Wl,--undefined,force_include_libentry -Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/renderdoc.version")
+    else()
     set(RDOC_LINK_FLAGS "-Wl,--undefined,force_include_libentry -Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/${RDOC_BASE_NAME}.version")
+    endif()
 
     if(NOT ENABLE_ASAN AND NOT ENABLE_TSAN)
         set(RDOC_LINK_FLAGS "${RDOC_LINK_FLAGS} -Wl,--no-undefined")
@@ -639,21 +780,38 @@ if(UNIX AND NOT ANDROID AND NOT APPLE)
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/librenderdoc.so-gdb.py ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/librenderdoc.so-gdb.py)
     endif()
 
+    if(BRANCH_DEV)
+        set_target_properties(${RDOC_MODULE} PROPERTIES LINK_FLAGS "${RDOC_LINK_FLAGS}")
+        set_target_properties(${RDOC_MODULE} PROPERTIES SKIP_BUILD_RPATH TRUE)
+    else()
     set_target_properties(renderdoc PROPERTIES LINK_FLAGS "${RDOC_LINK_FLAGS}")
     set_target_properties(renderdoc PROPERTIES SKIP_BUILD_RPATH TRUE)
+    endif()
 endif()
 
 # On macOS set the rpath so that linked libraries are relative to the executable, not absolute
 if(APPLE)
+    if(BRANCH_DEV)
+        set_target_properties(${RDOC_MODULE} PROPERTIES MACOSX_RPATH TRUE)
+        set_target_properties(${RDOC_MODULE} PROPERTIES SKIP_BUILD_RPATH TRUE)
+        set_target_properties(${RDOC_MODULE} PROPERTIES INSTALL_RPATH "@executable_path/../lib")
+        set_target_properties(${RDOC_MODULE} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+        set_target_properties(${RDOC_MODULE} PROPERTIES BUILD_WITH_INSTALL_NAME_DIR TRUE)
+    else()
     set_target_properties(renderdoc PROPERTIES MACOSX_RPATH TRUE)
     set_target_properties(renderdoc PROPERTIES SKIP_BUILD_RPATH TRUE)
     set_target_properties(renderdoc PROPERTIES INSTALL_RPATH "@executable_path/../lib")
     set_target_properties(renderdoc PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
     set_target_properties(renderdoc PROPERTIES BUILD_WITH_INSTALL_NAME_DIR TRUE)
+    endif()
 endif()
 
 if(INTERNAL_SELF_CAPTURE)
+    if(BRANCH_DEV)
+    set_target_properties(${RDOC_MODULE} PROPERTIES OUTPUT_NAME "rdocself")    
+    else()
     set_target_properties(renderdoc PROPERTIES OUTPUT_NAME "rdocself")
+    endif()
 endif()
 
 if(ANDROID)
@@ -661,9 +819,18 @@ if(ANDROID)
     if(ENABLE_ASAN)
         set(RDOC_LINK_FLAGS "${RDOC_LINK_FLAGS} -fsanitize=address")
     endif()
+
+    if(BRANCH_DEV)
+        set_target_properties(${RDOC_MODULE} PROPERTIES LINK_FLAGS "${RDOC_LINK_FLAGS}")
+        # rename output library
+        set(RENDERDOC_ANDROID_LIBRARY "VkLayer_GLES_RenderDoc")
+        #set(RENDERDOC_ANDROID_LIBRARY "FrameDebug")
+        set_target_properties(${RDOC_MODULE} PROPERTIES OUTPUT_NAME ${RENDERDOC_ANDROID_LIBRARY})
+    else()
     set_target_properties(renderdoc PROPERTIES LINK_FLAGS "${RDOC_LINK_FLAGS}")
     # rename output library
     set_target_properties(renderdoc PROPERTIES OUTPUT_NAME "VkLayer_GLES_RenderDoc")
+    endif()
 
     if(STRIP_ANDROID_LIBRARY AND ANDROID_STRIP_TOOL AND RELEASE_MODE)
         add_custom_command(TARGET renderdoc POST_BUILD
@@ -671,9 +838,23 @@ if(ANDROID)
             COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:renderdoc> $<TARGET_FILE:renderdoc>.dbg
             COMMAND ${ANDROID_STRIP_TOOL} --strip-unneeded $<TARGET_FILE:renderdoc>)
     endif()
+elseif(BRANCH_DEV)
+    set(RENDERDOC_ANDROID_LIBRARY ${RDOC_BASE_NAME})
+    set_target_properties(${RDOC_MODULE} PROPERTIES OUTPUT_NAME ${RENDERDOC_ANDROID_LIBRARY})
 endif()
 
+if(BRANCH_DEV)
+install (TARGETS ${RDOC_MODULE} DESTINATION lib${LIB_SUFFIX}/${LIB_SUBFOLDER})
+else()
 install (TARGETS renderdoc DESTINATION lib${LIB_SUFFIX}/${LIB_SUBFOLDER})
+endif()
 
 # Copy in application API header to include
 install (FILES api/app/renderdoc_app.h DESTINATION include RENAME renderdoc_app.h)
+
+if(BRANCH_DEV)
+my_set_target_folder(rdoc_amd "DLL/drivers/IHV")
+my_set_target_folder(rdoc_arm "DLL/drivers/IHV")
+my_set_target_folder(rdoc_intel "DLL/drivers/IHV")
+my_set_target_folder(rdoc_nv "DLL/drivers/IHV")
+endif()

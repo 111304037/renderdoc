@@ -34,7 +34,7 @@
 
 
 
-#define ForEachSupported(FUNC) \
+#define ForEachSupported_Base(FUNC) \
   FUNC(glBindTexture, glBindTexture); \
   FUNC(glBlendFunc, glBlendFunc); \
   FUNC(glClear, glClear); \
@@ -1298,7 +1298,7 @@
 
 
 
-#define DefineSupportedHooks() \
+#define DefineSupportedHooks_Base() \
   FuncWrapper2(void, glBindTexture, GLenum, target, GLuint, texture); \
   FuncWrapper2(void, glBlendFunc, GLenum, sfactor, GLenum, dfactor); \
   FuncWrapper1(void, glClear, GLbitfield, mask); \
@@ -2562,7 +2562,7 @@
 
 
 
-#define ForEachUnsupported(FUNC) \
+#define ForEachUnsupported_Base(FUNC) \
   FUNC(glAccum); \
   FUNC(glAccumxOES); \
   FUNC(glActiveProgramEXT); \
@@ -2866,7 +2866,7 @@
   FUNC(glEdgeFlagv); \
   FUNC(glEGLImageTargetRenderbufferStorageOES); \
   FUNC(glEGLImageTargetTexStorageEXT); \
-  FUNC(glEGLImageTargetTexture2DOES); \
+  /*FUNC(glEGLImageTargetTexture2DOES);*/ \
   FUNC(glEGLImageTargetTextureStorageEXT); \
   FUNC(glElementPointerAPPLE); \
   FUNC(glElementPointerATI); \
@@ -4471,7 +4471,7 @@
 
 
 
-#define DefineUnsupportedHooks() \
+#define DefineUnsupportedHooks_Base() \
   UnsupportedWrapper2(void, glAccum, GLenum, op, GLfloat, value); \
   UnsupportedWrapper2(void, glAccumxOES, GLenum, op, GLfixed, value); \
   UnsupportedWrapper1(void, glActiveProgramEXT, GLuint, program); \
@@ -4775,7 +4775,7 @@
   UnsupportedWrapper1(void, glEdgeFlagv, const GLboolean *, flag); \
   UnsupportedWrapper2(void, glEGLImageTargetRenderbufferStorageOES, GLenum, target, GLeglImageOES, image); \
   UnsupportedWrapper3(void, glEGLImageTargetTexStorageEXT, GLenum, target, GLeglImageOES, image, const GLint*, attrib_list); \
-  UnsupportedWrapper2(void, glEGLImageTargetTexture2DOES, GLenum, target, GLeglImageOES, image); \
+  /*UnsupportedWrapper2(void, glEGLImageTargetTexture2DOES, GLenum, target, GLeglImageOES, image);*/ \
   UnsupportedWrapper3(void, glEGLImageTargetTextureStorageEXT, GLuint, texture, GLeglImageOES, image, const GLint*, attrib_list); \
   UnsupportedWrapper2(void, glElementPointerAPPLE, GLenum, type, const void *, pointer); \
   UnsupportedWrapper2(void, glElementPointerATI, GLenum, type, const void *, pointer); \
@@ -7178,3 +7178,67 @@
   } \
   HOOK_EXPORT ret HOOK_CC function(t1 p1, t2 p2, t3 p3, t4 p4, t5 p5, t6 p6, t7 p7, t8 p8, t9 p9, t10 p10, t11 p11, t12 p12, t13 p13, t14 p14, t15 p15, t16 p16, t17 p17);
 
+
+/*
+gl_common.h
+-enum class GLChunk添加
+
+gl_dispatch_table.h
+-GLDispatchTable添加成员
+
+gl_driver.h
+-添加IMPLEMENT_FUNCTION_SERIALISED
+
+gl_xxx_funcs.h添加
+WrappedOpenGL::xxxx
+*/
+#if ENABLED(RDOC_WIN32)
+  //支持的接口
+  #define DefineSupportedHooks() \
+    DefineSupportedHooks_Base();\
+
+
+  #define ForEachSupported(FUNC) \
+    ForEachSupported_Base(FUNC);\
+
+
+
+  //不支持的接口
+  #define DefineUnsupportedHooks()\
+    DefineUnsupportedHooks_Base()\
+    UnsupportedWrapper2(void, glEGLImageTargetTexture2DOES, GLenum, target, GLeglImageOES, image); \
+
+    
+
+  #define ForEachUnsupported(FUNC) \
+    ForEachUnsupported_Base(FUNC)\
+    FUNC(glEGLImageTargetTexture2DOES); \
+	
+
+
+#else
+
+  //支持的接口
+  #define DefineSupportedHooks() \
+    DefineSupportedHooks_Base(); \
+    FuncWrapper2(void, glEGLImageTargetTexture2DOES, GLenum, target, GLeglImageOES, image);
+
+  #define ForEachSupported(FUNC) \
+    ForEachSupported_Base(FUNC);\
+    FUNC(glEGLImageTargetTexture2DOES, glEGLImageTargetTexture2DOES);
+
+  //不支持的接口
+  #define DefineUnsupportedHooks()\
+    DefineUnsupportedHooks_Base()\
+    /*UnsupportedWrapper2(void, glEGLImageTargetTexture2DOES, GLenum, target, GLeglImageOES, image);*/ \
+
+    
+
+  #define ForEachUnsupported(FUNC) \
+    ForEachUnsupported_Base(FUNC)\
+    /*FUNC(glEGLImageTargetTexture2DOES);*/ \
+	
+
+
+
+#endif

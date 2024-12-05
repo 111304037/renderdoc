@@ -35,6 +35,64 @@
 #include "strings/string_utils.h"
 
 #include <string>
+#if BRANCH_DEV
+#include "api/replay/renderdoc_replay.h"
+#include <stdio.h>
+#include <windows.h>
+//#include <atlconv.h>
+#include <iostream>
+#include "hooks/hooks.h"
+
+/*
+https://blog.csdn.net/u013919153/article/details/121263590
+*/
+std::string get_last_error(int errCode)
+{
+  std::string err("");
+  if(errCode == 0)
+    errCode = GetLastError();
+  LPTSTR lpBuffer = NULL;
+
+  if(0 ==
+     FormatMessage(
+         FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+             FORMAT_MESSAGE_IGNORE_INSERTS,    //标志位，决定如何说明lpSource参数，dwFlags的低位指定如何处理换行功能在输出缓冲区，也决定最大宽度的格式化输出行,可选参数。
+         NULL,                                 //根据dwFlags标志而定。
+         errCode,    //请求的消息的标识符。当dwFlags标志为FORMAT_MESSAGE_FROM_STRING时会被忽略。
+         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),    //请求的消息的语言标识符。
+         (LPTSTR)&lpBuffer,    //接收错误信息描述的缓冲区指针。
+         0,    //如果FORMAT_MESSAGE_ALLOCATE_BUFFER标志没有被指定，这个参数必须指定为输出缓冲区的大小，如果指定值为0，这个参数指定为分配给输出缓冲区的最小数。
+         NULL    //保存格式化信息中的插入值的一个数组。
+         ))
+  {    //失败
+    char tmp[100] = {0};
+    sprintf_s(tmp, "{未定义错误描述(%d)}", errCode);
+    err = tmp;
+  }
+  else    //成功
+  {
+    //USES_CONVERSION;
+    //err = W2A(lpBuffer);
+    //LocalFree(lpBuffer);
+    /*
+    int bufSize = WideCharToMultiByte( CP_UTF8, 0, lpBuffer, -1, nullptr, 0, nullptr, nullptr );
+    char *utf8Argv = new char[ bufSize ];
+    WideCharToMultiByte( CP_UTF8, 0, lpBuffer, -1, utf8Argv, bufSize, nullptr, nullptr );
+    err = utf8Argv;
+    */
+   rdcstr str = StringFormat::Wide2UTF8(lpBuffer);
+   if(str.length() > 0){
+     int idx = str.find("\n");
+     if(idx >= 0){
+      err = str.substr(0, idx).c_str();
+     }else{
+      err = str.c_str();
+     }
+   }
+  }
+  return err;
+}
+#endif
 
 static rdcarray<EnvironmentModification> &GetEnvModifications()
 {
@@ -171,7 +229,12 @@ uint64_t Process::GetMemoryUsage()
 
   if(proc == NULL)
   {
+#if BRANCH_DEV
+    int err_code = GetLastError();
+    RDCERR("Couldn't open process: %s(%d)", get_last_error(err_code).c_str(), err_code);
+#else
     RDCERR("Couldn't open process: %d", GetLastError());
+#endif
     return 0;
   }
 
@@ -185,7 +248,12 @@ uint64_t Process::GetMemoryUsage()
   }
   else
   {
+#if BRANCH_DEV
+    int err_code = GetLastError();
+    RDCERR("Couldn't get process memory info: %s(%d)", get_last_error(err_code).c_str(), err_code);
+#else
     RDCERR("Couldn't get process memory info: %d", GetLastError());
+#endif
   }
 
   return ret;
@@ -279,20 +347,38 @@ void InjectDLL(HANDLE hProcess, rdcwstr libName)
       }
       else
       {
+#if BRANCH_DEV
+        int err_code = GetLastError();
+        RDCERR("Couldn't create remote thread for LoadLibraryW: %s(%d)",
+               get_last_error(err_code).c_str(), err_code);
+#else
         RDCERR("Couldn't create remote thread for LoadLibraryW: %u", GetLastError());
+#endif
       }
     }
     else
     {
+#if BRANCH_DEV
+      int err_code = GetLastError();
+      RDCERR("Couldn't write remote memory %p with dllPath '%ls': %s(%d)", remoteMem, dllPath,
+             get_last_error(err_code).c_str(), err_code);
+#else
       RDCERR("Couldn't write remote memory %p with dllPath '%ls': %u", remoteMem, dllPath,
              GetLastError());
+#endif
     }
 
     VirtualFreeEx(hProcess, remoteMem, 0, MEM_RELEASE);
   }
   else
   {
+#if BRANCH_DEV
+    int err_code = GetLastError();
+    RDCERR("Couldn't allocate remote memory for DLL '%ls': %s(%d)", libName.c_str(),
+           get_last_error(err_code).c_str(), err_code);
+#else
     RDCERR("Couldn't allocate remote memory for DLL '%ls': %u", libName.c_str(), GetLastError());
+#endif
   }
 }
 
@@ -1219,6 +1305,9 @@ static RDResult HandleRegError(HKEY keyNative, HKEY keyWow32, LSTATUS ret, const
     return HandleRegError(keyNative, keyWow32, ret, msg); \
   }
 
+/*
+备份+修改注册表
+*/
 // function to backup the previous settings for AppInit, then enable it and write our own paths.
 RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpathWow32,
                                  const rdcstr &shimpathNative)
@@ -1226,10 +1315,23 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
   HKEY keyNative = NULL;
   HKEY keyWow32 = NULL;
 
+  /*
+  https://xz.aliyun.com/t/10256
+  https://blog.csdn.net/Gamma_lab/article/details/123450922
+  全局注入 AppInit_DLLs
+  AppInit_DLLs支持将一组DLL加载到系统上每个用户模式进程
+  Win+R->regedit
+  HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows\AppInit_DLLs
+  LoadAppInit_DLLS: 0x1 开启
+  AppInit_DLLs值为注入dll的文件路径
+  注意:需要在bios里关闭security boot
+  */
   // AppInit_DLLs requires short paths, but short paths can be disabled globally or on a per-volume
   // level. If short paths are disabled we'll get the long path back, we *always* expect the path to
   // get shorter because the shim filename is bigger than 8.3.
 
+  /*
+  检查短路径
   DWORD nativeShortSize = GetShortPathNameW(StringFormat::UTF82Wide(shimpathNative).c_str(), NULL,
                                             (DWORD)shimpathNative.length());
   if(nativeShortSize == (DWORD)shimpathNative.length() + 1)
@@ -1253,7 +1355,9 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
           "For the global hook, short paths must be enabled where RenderDoc is installed.");
     }
   }
+  */
 
+  //创建注册表
   // open the native key
   LSTATUS ret = RegCreateKeyExA(HKEY_LOCAL_MACHINE,
                                 "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows", 0, NULL,
@@ -1262,7 +1366,11 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
   REG_CHECK("Could not open AppInit key");
 
   // if we are doing Wow32, open that key as well
+#if BRANCH_DEV
+  if(FileIO::exists(shimpathWow32)) //!shimpathWow32.empty())
+#else
   if(!shimpathWow32.empty())
+#endif
   {
     ret = RegCreateKeyExA(HKEY_LOCAL_MACHINE,
                           "SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
@@ -1271,6 +1379,7 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
     REG_CHECK("Could not open AppInit key");
   }
 
+  //获取LoadAppInit_DLLs值
   const DWORD one = 1;
 
   // fetch the previous data for LoadAppInit_DLLs and AppInit_DLLs
@@ -1278,7 +1387,9 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
   ret = RegGetValueA(keyNative, NULL, "LoadAppInit_DLLs", RRF_RT_REG_DWORD, NULL,
                      (void *)&hookdata.dataNative.appinitEnabled, &sz);
   REG_CHECK("Could not fetch LoadAppInit_DLLs");
+  RDCLOG("read LoadAppInit_DLLs=%d", one);
 
+  //获取AppInit_DLLs值
   sz = 0;
   ret = RegGetValueW(keyNative, NULL, L"AppInit_DLLs", RRF_RT_ANY, NULL, NULL, &sz);
   if(ret == ERROR_MORE_DATA || ret == ERROR_SUCCESS)
@@ -1288,19 +1399,39 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
                        hookdata.dataNative.appinitDLLs.data(), &sz);
   }
   REG_CHECK("Could not fetch AppInit_DLLs");
+  RDCLOG("read LoadAppInit_DLLs=%s", StringFormat::Wide2UTF8(hookdata.dataNative.appinitDLLs).c_str());
 
+  //设置LoadAppInit_DLLs值
   // set DWORD:1 for LoadAppInit_DLLs and convert our path to a short path then set it
   ret = RegSetValueExA(keyNative, "LoadAppInit_DLLs", 0, REG_DWORD, (const BYTE *)&one, sizeof(one));
   REG_CHECK("Could not set LoadAppInit_DLLs");
 
+
   rdcwstr shortpath(shimpathNative.size());
+#if BRANCH_DEV
+  //设置AppInit_DLLs值
+  DWORD nativeShortSize = GetShortPathNameW(StringFormat::UTF82Wide(shimpathNative).c_str(),
+                                         shortpath.data(),
+                    (DWORD)shortpath.length());
+  if(nativeShortSize == (DWORD)shimpathNative.length() + 1)
+  {
+    shortpath = StringFormat::UTF82Wide(shimpathNative).c_str();
+  }
+  else {
+      int err_code = GetLastError();
+      RDCERR("Could not GetShortPathNameW: %s(%d)", get_last_error(err_code).c_str(), err_code);
+  }
+#else
   GetShortPathNameW(StringFormat::UTF82Wide(shimpathNative).c_str(), shortpath.data(),
                     (DWORD)shortpath.length());
+#endif
 
   ret = RegSetValueExW(keyNative, L"AppInit_DLLs", 0, REG_SZ, (const BYTE *)shortpath.data(),
                        DWORD(shortpath.length() * sizeof(wchar_t)));
   REG_CHECK("Could not set AppInit_DLLs");
+  RDCLOG("set AppInit_DLLs:%s", StringFormat::Wide2UTF8(shortpath).c_str());
 
+  //32位处理
   // if we're doing Wow32, repeat the process for those keys
   if(keyWow32)
   {
@@ -1323,8 +1454,18 @@ RDResult BackupAndChangeRegistry(GlobalHookData &hookdata, const rdcstr &shimpat
     REG_CHECK("Could not set LoadAppInit_DLLs");
 
     shortpath = rdcwstr(shimpathWow32.size());
+#if BRANCH_DEV
+    DWORD wow32ShortSize = GetShortPathNameW(StringFormat::UTF82Wide(shimpathWow32).c_str(),
+                                           shortpath.data(),
+                      (DWORD)shortpath.length());
+    if(wow32ShortSize == (DWORD)shimpathWow32.length() + 1)
+    {
+      shortpath = StringFormat::UTF82Wide(shimpathWow32).c_str();
+    }
+#else
     GetShortPathNameW(StringFormat::UTF82Wide(shimpathWow32).c_str(), shortpath.data(),
                       (DWORD)shortpath.length());
+#endif
 
     ret = RegSetValueExW(keyWow32, L"AppInit_DLLs", 0, REG_SZ, (const BYTE *)shortpath.data(),
                          DWORD(shortpath.length() * sizeof(wchar_t)));
@@ -1425,7 +1566,11 @@ void RestoreRegistry(const GlobalHookData &hookdata)
   REG_CHECK("Could not set AppInit_DLLs");
 
   // if we opened it, restore the Wow32 values as well
+#if BRANCH_DEV
+  if(keyWow32 && hookdata.dataWow32.appinitEnabled)
+#else
   if(keyWow32)
+#endif
   {
     ret = RegSetValueExA(keyWow32, "LoadAppInit_DLLs", 0, REG_DWORD,
                          (const BYTE *)&hookdata.dataWow32.appinitEnabled,
@@ -1588,8 +1733,14 @@ RDResult Process::StartGlobalHook(const rdcstr &pathmatch, const rdcstr &capture
     {
       err = GetLastError();
       RestoreRegistry(hookdata);
+#if BRANCH_DEV
+      RETURN_ERROR_RESULT(ResultCode::InternalError,
+                          "Could not create 32-bit stdin pipe (err %s(%d))",
+                          get_last_error(err).c_str(), err);
+#else
       RETURN_ERROR_RESULT(ResultCode::InternalError, "Could not create 32-bit stdin pipe (err %u)",
                           err);
+#endif
     }
 
     // we don't want the child process to inherit our end
@@ -1599,8 +1750,14 @@ RDResult Process::StartGlobalHook(const rdcstr &pathmatch, const rdcstr &capture
     {
       err = GetLastError();
       RestoreRegistry(hookdata);
+#if BRANCH_DEV
+      RETURN_ERROR_RESULT(ResultCode::InternalError,
+                          "Could not make 32-bit stdin pipe inheritable (err %s(%d))",
+                          get_last_error(err).c_str(), err);
+#else
       RETURN_ERROR_RESULT(ResultCode::InternalError,
                           "Could not make 32-bit stdin pipe inheritable (err %u)", err);
+#endif
     }
 
     si.hStdInput = childEnd;
@@ -1619,8 +1776,13 @@ RDResult Process::StartGlobalHook(const rdcstr &pathmatch, const rdcstr &capture
   {
     CloseHandle(hookdata.dataNative.pipe);
     RestoreRegistry(hookdata);
+#if BRANCH_DEV
+    RETURN_ERROR_RESULT(ResultCode::InternalError, "Can't launch renderdoccmd from '%s' (err %s(%d))", cmdpathNative.c_str(),
+                        get_last_error(err).c_str(), err);
+#else
     RETURN_ERROR_RESULT(ResultCode::InternalError, "Can't launch renderdoccmd from '%s' (err %u)",
                         cmdpathNative.c_str(), err);
+#endif
   }
 
   CloseHandle(pi.hThread);

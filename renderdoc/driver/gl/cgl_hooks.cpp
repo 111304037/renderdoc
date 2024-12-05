@@ -205,7 +205,7 @@ extern void AppleRegisterRealSymbol(const char *functionName, void *address);
 
 static void CGLHooked(void *handle)
 {
-  RDCDEBUG("CGL library hooked");
+  RDCDEBUG("[+]CGL library hooked");
 
   // store the handle for any pass-through implementations that need to look up their onward
   // pointers

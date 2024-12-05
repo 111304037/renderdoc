@@ -27,6 +27,11 @@
 
 #include "gl_common.h"
 
+#if BRANCH_DEV
+//华为
+typedef void(APIENTRYP PFN_glEGLImageTargetTexture2DOES_PROC)(GLenum target, GLeglImageOES image);
+#endif
+
 class WrappedOpenGL;
 
 typedef std::function<void *(const char *)> PlatformGetProcAddr;
@@ -967,6 +972,12 @@ struct GLDispatchTable
   PFNWGLDXOBJECTACCESSNVPROC wglDXObjectAccessNV;
   PFNWGLDXLOCKOBJECTSNVPROC wglDXLockObjectsNV;
   PFNWGLDXUNLOCKOBJECTSNVPROC wglDXUnlockObjectsNV;
+
+#if BRANCH_DEV
+  //华为
+  PFN_glEGLImageTargetTexture2DOES_PROC glEGLImageTargetTexture2DOES;
+#endif
+
 };
 // clang-format on
 

@@ -61,6 +61,30 @@ Connection::Connection(Network::Socket *sock)
   writer.Flush();
 
   char response[15] = {};
+#if BRANCH_DEV
+  if(reader.Read(response, handshakeLength))
+  {
+    if(memcmp(handshake, response, 14) != 0)
+    {
+      RDCERR("handshake failed - received >%s< - expected >%s<", response, handshake);
+      error = true;
+    }
+    else
+    {
+      RDCLOG("jdwp connect suc,nice!");
+	}
+  }
+  else
+  {
+    RDResult errorRet = reader.GetError();
+    RDCERR(
+        "handshake received failed - code=%d, error >%s<\nUse of JDWP to launch and inject into "
+        "the application failed, this most often indicates that some\nother JDWP-using program "
+        "such as Android Studio is interfering.",
+        errorRet.code, errorRet.message.c_str());
+    error = true;
+  }
+#else
   reader.Read(response, handshakeLength);
 
   if(memcmp(handshake, response, 14) != 0)
@@ -68,6 +92,7 @@ Connection::Connection(Network::Socket *sock)
     RDCERR("handshake failed - received >%s< - expected >%s<", response, handshake);
     error = true;
   }
+#endif
 }
 
 Connection::~Connection()
@@ -597,7 +622,28 @@ value Connection::InvokeInstance(threadID thread, classID clazz, methodID method
 
   if(exception.id != 0)
   {
+#if BRANCH_DEV
+    rdcstr msg;
+    if(exception.tag == Tag::Object)
+    {
+      referenceTypeID thisType = this->GetType(exception.id);
+      methodID getClass = this->GetMethod(thisType, "getClass", "()Ljava/lang/Class;");
+      value thisClass = this->InvokeInstance(thread, thisType, getClass, exception.id, {});
+      referenceTypeID classID = GetType("Ljava/lang/Class;");
+      methodID toStrMethod2 = GetMethod(classID, "toString", "()Ljava/lang/String;");
+      value ret = this->InvokeInstance(thread, classID, toStrMethod2, thisClass.Object, {});
+      msg = "type:"+ this->GetString(ret.String);
+
+
+      methodID toStrMethod =
+          this->GetMethod(thisType, "toString", "()Ljava/lang/String;");
+       ret = this->InvokeInstance(thread, thisType, toStrMethod, exception.id, {});
+      msg += "\n" + this->GetString(ret.Object);
+	  }
+    RDCERR("Exception encountered while invoking method, please see android logcat!\n%s", msg.c_str());
+#else
     RDCERR("Exception encountered while invoking method");
+#endif
     return {};
   }
 

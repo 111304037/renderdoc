@@ -300,6 +300,9 @@ rdcarray<ExtensionMetadata> CaptureContext::GetInstalledExtensions()
 
   for(QString extensionFolder : PythonContext::GetApplicationExtensionsPaths())
   {
+#if BRANCH_DEV
+    qInfo() << extensionFolder;
+#endif
     QDirIterator it(extensionFolder, QDirIterator::Subdirectories);
 
     while(it.hasNext())
@@ -901,11 +904,15 @@ void CaptureContext::LoadCapture(const rdcstr &captureFile, const ReplayOptions 
 
     rdcarray<ICaptureViewer *> viewers(m_CaptureViewers);
 
+#if BRANCH_DEV
+    SetEventID(viewers, 0, 0, true);
+#else
     // make sure we're on a consistent event before invoking viewer forms
     if(m_LastAction)
       SetEventID(viewers, m_LastAction->eventId, m_LastAction->eventId, true);
     else if(!m_Actions->empty())
       SetEventID(viewers, m_Actions->back().eventId, m_Actions->back().eventId, true);
+#endif
 
     GUIInvoke::blockcall(m_MainWindow, [&viewers]() {
       // notify all the registers viewers that a capture has been loaded

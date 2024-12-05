@@ -44,6 +44,10 @@
 
 #include <string>
 
+#if BRANCH_DEV
+#include "api/replay/renderdoc_replay.h"
+#endif
+
 // magic value that the config vars default to. If we see this, we'll upgrade the old .ini
 #define UNINITIALISED_VAR ":uninit:var:"
 

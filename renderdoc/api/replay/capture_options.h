@@ -222,6 +222,15 @@ Units are in MBs, suggested values would range from 200MB to 1000MB.
 Default - 0 Megabytes
 )");
   uint32_t softMemoryLimit;
+
+
+#if BRANCH_DEV
+  DOCUMENT("``True`` Capture Vulkan.");
+  bool captureVulkan;
+
+  DOCUMENT("``True`` Use NativeLayers.");
+  bool useNativeLayers;
+#endif
 };
 
 DECLARE_REFLECTION_STRUCT(CaptureOptions);

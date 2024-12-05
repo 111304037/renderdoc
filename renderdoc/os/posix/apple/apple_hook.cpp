@@ -125,12 +125,14 @@ void LibraryHooks::EndHookRegistration()
     }
   }
 
+  RDCLOG("[*]apple_hook functionHooks:%d", functionHooks.size());
   // get the original pointers for all hooks now. All of the ones we will be able to get should now
   // be available in the default namespace straight away
   for(FunctionHook &hook : functionHooks)
   {
     if(hook.orig && *hook.orig == NULL)
     {
+      RDCLOG("hook success:%s", hook.function.c_str());
       // Try to get direct compile time function pointer before using dlsym
       auto it = realSymbols.find(hook.function);
       if(it != realSymbols.end())
@@ -142,6 +144,8 @@ void LibraryHooks::EndHookRegistration()
         *hook.orig = dlsym(RTLD_NEXT, hook.function.c_str());
       }
       RDCASSERT(*hook.orig != hook.hook, hook.function);
+    }else{
+      RDCLOG("hook fail:%s", hook.function.c_str());
     }
   }
 }

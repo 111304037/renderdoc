@@ -1,6 +1,46 @@
 option(STATIC_QRENDERDOC "Compile qrenderdoc as static" OFF)
 option(QRENDERDOC_NO_CXX11_REGEX "Disable C++11 regex in scintilla" OFF)
 
+if(BRANCH_DEV AND WIN32)
+    if(CMAKE_CL_64)
+        SET(QT_LIB_PATH ${CMAKE_CURRENT_LIST_DIR}/3rdparty/Qt/x64)
+    else()
+        SET(QT_LIB_PATH ${CMAKE_CURRENT_LIST_DIR}/3rdparty/Qt/Win32)
+    endif()
+    set(qt_libs
+        ${QT_LIB_PATH}/bin/Qt5Core.dll
+        ${QT_LIB_PATH}/bin/Qt5Gui.dll
+        ${QT_LIB_PATH}/bin/Qt5Network.dll
+        ${QT_LIB_PATH}/bin/Qt5Svg.dll
+        ${QT_LIB_PATH}/bin/Qt5Widgets.dll
+    )
+    foreach(qt_lib ${qt_libs})
+        file(COPY ${qt_lib} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+    endforeach()
+
+    if(NOT EXISTS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}/python36.zip")
+        file(COPY ${QT_LIB_PATH}/plugins DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+        file(RENAME ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}/plugins ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}/qtplugins)
+
+        #copy python
+        file(COPY ${PYTHON_DLL} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+        file(COPY ${CMAKE_CURRENT_LIST_DIR}/3rdparty/python/python36.zip DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+        if(CMAKE_CL_64)
+            file(COPY ${CMAKE_CURRENT_LIST_DIR}/3rdparty/python/x64/_ctypes.pyd DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+            file(GLOB TMP_FILES ${CMAKE_SOURCE_DIR}/renderdoc/3rdparty/dbghelp/x64/*.*)
+            file(COPY ${TMP_FILES} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+            message("TMP_FILES:${TMP_FILES}")
+            file(GLOB TMP_FILES ${CMAKE_SOURCE_DIR}/renderdoc/3rdparty/yasio/thirdparty/openssl/prebuilt/win/x64/*.dll)
+            file(COPY ${TMP_FILES} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+        else()
+            file(COPY ${CMAKE_CURRENT_LIST_DIR}/3rdparty/python/Win32/_ctypes.pyd DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+            file(GLOB TMP_FILES ${CMAKE_SOURCE_DIR}/renderdoc/3rdparty/dbghelp/Win32/*.*)
+            file(COPY ${TMP_FILES} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+            file(GLOB TMP_FILES ${CMAKE_SOURCE_DIR}/renderdoc/3rdparty/yasio/thirdparty/openssl/prebuilt/win/x86/*.dll)
+            file(COPY ${TMP_FILES} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+        ENDIF()
+    endif()
+else()
 if( NOT DEFINED QT_QMAKE_EXECUTABLE )
     if( DEFINED QMAKE_EXECUTABLE )
         set( QT_QMAKE_EXECUTABLE "${QMAKE_EXECUTABLE}" )
@@ -24,6 +64,8 @@ execute_process(
     ERROR_STRIP_TRAILING_WHITESPACE
     )
 
+message("QT_VERSION:${QT_VERSION}")
+
 # we need the trailing .999 since 5.5.1 would be VERSION_GREATER than 5.5 which implicitly means 5.5.0
 if (QT_VERSION VERSION_GREATER 5.5.999)
     message(STATUS "Building using Qt ${QT_VERSION}")
@@ -32,6 +74,7 @@ else()
 endif()
 
 endif() # if(ENABLE_QRENDERDOC)
+endif()
 
 set(QMAKE_CONFIG "debug")
 set(QMAKE_LDFLAGS "")
@@ -106,6 +149,11 @@ if(APPLE)
         COMMAND sips -z 1024 1024 logo.svg.png --out RenderDoc.iconset/icon_512x512@2x.png
         COMMAND iconutil -c icns RenderDoc.iconset
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/logo.svg)
+elseif(BRANCH_DEV AND WIN32)
+    add_custom_command(
+        OUTPUT RenderDoc.icns
+        COMMAND cmd /c "type nul > RenderDoc.icns"
+    )
 else()
     add_custom_command(OUTPUT RenderDoc.icns COMMAND touch RenderDoc.icns)
 endif()
@@ -152,6 +200,24 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.24")
     cmake_policy(SET CMP0135 NEW)
 endif()
 
+if(BRANCH_DEV)
+    if(WIN32)
+        set(custom_swig)
+    else()
+        if(NOT EXISTS "${CMAKE_BINARY_DIR}/qrenderdoc/custom_swig-prefix/src/renderdoc-modified-7.zip")
+            message("[+]download swig:${RENDERDOC_SWIG_PACKAGE} => ${CMAKE_BINARY_DIR}")
+            # Compile our custom SWIG that will do scoped/strong enum classes
+            ExternalProject_Add(custom_swig
+                # using an URL to a zip directly so we don't clone the history etc
+                URL ${RENDERDOC_SWIG_PACKAGE}
+                BUILD_IN_SOURCE 1
+                CONFIGURE_COMMAND ${SET_SYSTEM_PATH_COMMAND} ./autogen.sh > /dev/null 2>&1
+                COMMAND CC=${SWIG_CONFIGURE_CC} CXX=${SWIG_CONFIGURE_CXX} CFLAGS=-fPIC CXXFLAGS=-fPIC ${SET_SYSTEM_PATH_COMMAND} ./configure --with-pcre=yes --prefix=${CMAKE_BINARY_DIR} > /dev/null
+                BUILD_COMMAND ${GENERATOR_MAKE} ${GENERATOR_MAKE_PARAMS} > /dev/null 2>&1
+                INSTALL_COMMAND ${GENERATOR_MAKE} install > /dev/null 2>&1)
+        endif()
+    endif()
+else()
 # Compile our custom SWIG that will do scoped/strong enum classes
 ExternalProject_Add(custom_swig
     # using an URL to a zip directly so we don't clone the history etc
@@ -161,6 +227,7 @@ ExternalProject_Add(custom_swig
     COMMAND CC=${SWIG_CONFIGURE_CC} CXX=${SWIG_CONFIGURE_CXX} CFLAGS=-fPIC CXXFLAGS=-fPIC ${SET_SYSTEM_PATH_COMMAND} ./configure --with-pcre=yes --prefix=${CMAKE_BINARY_DIR} > /dev/null
     BUILD_COMMAND ${GENERATOR_MAKE} ${GENERATOR_MAKE_PARAMS} > /dev/null 2>&1
     INSTALL_COMMAND ${GENERATOR_MAKE} install > /dev/null 2>&1)
+endif()
 
 find_package(Shiboken2 QUIET)
 find_package(PySide2 QUIET)
@@ -319,6 +386,41 @@ file(GLOB QRD_INTERFACE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Code/Interface/*.h)
 list(SORT RDOC_REPLAY_FILES)
 list(SORT QRD_INTERFACE_FILES)
 
+if(BRANCH_DEV AND WIN32)
+    #生成swig文件
+    foreach(in ${swig_interfaces})
+        get_filename_component(swig_file ${in} NAME_WE)
+
+        set(swig_output_dir ${CMAKE_CURRENT_BINARY_DIR})
+        if(WIN32)
+            set(swig_bin ${CMAKE_CURRENT_LIST_DIR}/3rdparty/swig/swig.exe)
+            set(swig_inputs -I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/renderdoc/api/replay)
+            set(swig_cmd ${swig_bin} -v -Wextra -Werror -O -interface ${swig_file} -c++ -python -modern -modernargs -enumclass -fastunpack -py3 -builtin ${swig_inputs} -outdir ${swig_output_dir} -o ${swig_output_dir}/${swig_file}_python.cxx ${CMAKE_CURRENT_LIST_DIR}/${in})
+        else()
+            set(swig_bin ${CMAKE_BINARY_DIR}/bin/swig)
+            set(swig_inputs -I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/renderdoc/api/replay)
+            set(swig_cmd ${swig_bin} -v -Wextra -Werror ${SWIG_FLAGS} -O -c++ -python -modern -interface ${swig_file} -modernargs -enumclass -fastunpack -py3 -builtin ${swig_inputs} -outdir ${swig_output_dir} -o ${swig_output_dir}/${swig_file}_python.cxx ${CMAKE_CURRENT_SOURCE_DIR}/${in})
+        endif()
+        #set(ouput_file ${swig_output_dir}/${swig_file}_python.cxx ${swig_output_dir}/${swig_file}.py)
+        set(ouput_file ${swig_output_dir}/${swig_file}_python.cxx)
+        if(NOT EXISTS ${ouput_file})
+            add_custom_command(
+                    OUTPUT ${ouput_file}
+                    COMMENT "Compiling SWIG:${ouput_file}"
+                    COMMAND ${swig_cmd}
+                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${in}
+                    DEPENDS custom_swig
+                    DEPENDS ${RDOC_REPLAY_FILES}
+                    DEPENDS ${QRD_INTERFACE_FILES}
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                    VERBATIM
+            )
+        endif()
+
+        list(APPEND swig_output ${ouput_file})
+        message("[+]swig ${swig_cmd}")
+    endforeach()
+else()
 foreach(in ${swig_interfaces})
     get_filename_component(swig_file ${in} NAME_WE)
 
@@ -331,6 +433,7 @@ foreach(in ${swig_interfaces})
 
     list(APPEND swig_output ${swig_file}_python.cxx)
 endforeach()
+endif()
 
 add_custom_target(swig-bindings ALL DEPENDS ${swig_output})
 
@@ -371,6 +474,9 @@ if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
     list(APPEND QRD_DEPENDENCIES ${QRD_XCODE_SOURCES})
 endif()
 
+if(BRANCH_DEV AND WIN32)
+    include(QRenderDoc.cmake)
+else()
 # The case here is deliberately not matching the executable name
 # This means the custom command doesn't create this output file,
 # which causes CMake to rerun this target every time so that Qt
@@ -381,6 +487,7 @@ add_custom_command(OUTPUT QRenderDoc
     COMMAND ${SET_SYSTEM_PATH_COMMAND} ${QMAKE_QT5_COMMAND} "CMAKE_DIR=${CMAKE_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND ${GENERATOR_MAKE} ${GENERATOR_MAKE_PARAMS}
     DEPENDS ${QRD_DEPENDENCIES})
+endif()
 add_custom_target(build-qrenderdoc ALL DEPENDS QRenderDoc DEPENDS renderdoc DEPENDS swig-bindings)
 
 if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
@@ -419,4 +526,11 @@ endif() # if(ENABLE_QRENDERDOC)
 # Build python modules - primarily used for constructing documentation
 if(ENABLE_PYRENDERDOC AND UNIX)
     add_subdirectory(Code/pyrenderdoc)
+endif()
+
+if(BRANCH_DEV)
+add_subdirectory(Code/pyrenderdoc)
+my_set_target_folder(build-qrenderdoc "UI")
+my_set_target_folder(QRenderDoc "UI")
+my_set_target_folder(swig-bindings "UI")
 endif()

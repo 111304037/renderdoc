@@ -578,9 +578,17 @@ public:
   }
   virtual int Execute(const CaptureOptions &)
   {
+#if BRANCH_DEV
+    LOGD("[+]Execute ReplayCommand:%s", remote_host.c_str());
+    LOGD("filename:%s", filename.c_str());
+#endif
     if(!remote_host.empty())
     {
+#if BRANCH_DEV
+      LOGD("Replaying '%s' on %s.",filename.c_str(), remote_host.c_str());
+#else
       std::cout << "Replaying '" << filename << "' on " << remote_host << "." << std::endl;
+#endif
 
       IRemoteServer *remote = NULL;
       ResultDetails result = RENDERDOC_CreateRemoteServerConnection(conv(remote_host), &remote);
@@ -594,7 +602,11 @@ public:
         return 1;
       }
 
+#if BRANCH_DEV
+      LOGD("Copying capture file to remote server");
+#else
       std::cerr << "Copying capture file to remote server" << std::endl;
+#endif
 
       rdcstr remotePath = remote->CopyCaptureToRemote(conv(filename), NULL);
 
@@ -609,15 +621,23 @@ public:
       }
       else
       {
+#if BRANCH_DEV
+        LOGE("Couldn't load and replay '%s': %s", filename.c_str(), result.Message().c_str());
+#else
         std::cerr << "Couldn't load and replay '" << filename << "': " << result.Message()
                   << std::endl;
+#endif
       }
 
       remote->ShutdownConnection();
     }
     else
     {
+#if BRANCH_DEV
+      LOGD("Replaying '%s' locally..",filename.c_str());
+#else
       std::cout << "Replaying '" << filename << "' locally.." << std::endl;
+#endif
 
       ICaptureFile *file = RENDERDOC_OpenCaptureFile();
 
@@ -625,7 +645,11 @@ public:
 
       if(res.code != ResultCode::Succeeded)
       {
+#if BRANCH_DEV
+        LOGE("Couldn't load and replay '%s': %s", filename.c_str(), res.Message().c_str());
+#else
         std::cerr << "Couldn't load '" << filename << "': " << res.Message() << std::endl;
+#endif
         return 1;
       }
 
@@ -1588,8 +1612,18 @@ int renderdoccmd(GlobalEnvironment &env, std::vector<std::string> &argv)
     argv.erase(argv.begin());
 
     std::string command = *argv.begin();
+#if BRANCH_DEV
+    LOGD("[>]command:%s", command.c_str());
+#endif
 
     argv.erase(argv.begin());
+
+#if BRANCH_DEV
+    int i=0;
+    for(auto itr = argv.begin(); itr != argv.end(); itr++){
+        LOGD("[>]arg[%d]:%s", i++, itr->c_str());
+    }
+#endif
 
     auto it = commands.find(command);
 

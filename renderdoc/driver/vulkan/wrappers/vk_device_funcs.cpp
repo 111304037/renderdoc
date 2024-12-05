@@ -2235,6 +2235,10 @@ bool WrappedVulkan::Serialise_vkCreateDevice(SerialiserType &ser, VkPhysicalDevi
     VkPhysicalDeviceFeatures availFeatures = {0};
     ObjDisp(physicalDevice)->GetPhysicalDeviceFeatures(Unwrap(physicalDevice), &availFeatures);
 
+/*
+BRANCH_DEV
+检查当前feature与回放feature是否一致
+*/
 #define CHECK_PHYS_FEATURE(feature)                                            \
   if(enabledFeatures.feature && !availFeatures.feature)                        \
   {                                                                            \

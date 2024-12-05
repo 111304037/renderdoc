@@ -5170,6 +5170,13 @@ bool WrappedOpenGL::ProcessChunk(ReadSerialiser &ser, GLChunk chunk)
              ToStr(chunk).c_str());
       ser.SkipCurrentChunk();
       return false;
+      
+#if BRANCH_DEV
+    //华为
+    case GLChunk::glEGLImageTargetTexture2DOES:
+      return Serialise_glEGLImageTargetTexture2DOES(ser,eGL_NONE,0);
+#endif
+
   }
 
   return false;

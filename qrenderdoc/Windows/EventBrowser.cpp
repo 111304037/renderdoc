@@ -170,6 +170,9 @@ enum
   COL_EID,
   COL_ACTION,
   COL_DURATION,
+#if BRANCH_DEV
+  COL_ENABLE,
+#endif
   COL_COUNT,
 };
 
@@ -618,6 +621,8 @@ struct EventItemModel : public QAbstractItemModel
   //
   // QAbstractItemModel methods
 
+#pragma region QAbstractItemModel methods
+  //索引模型数据
   QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override
   {
     if(!m_Ctx.IsCaptureLoaded())
@@ -678,6 +683,7 @@ struct EventItemModel : public QAbstractItemModel
     return m_Nodes[action->parent->eventId].index;
   }
 
+  //行数
   int rowCount(const QModelIndex &parent = QModelIndex()) const override
   {
     if(!m_Ctx.IsCaptureLoaded())
@@ -709,13 +715,19 @@ struct EventItemModel : public QAbstractItemModel
     return 0;
   }
 
+  //列数
   int columnCount(const QModelIndex &parent = QModelIndex()) const override { return COL_COUNT; }
+
+  //列表head
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override
   {
     if(orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
       switch(section)
       {
+#if BRANCH_DEV
+        case COL_ENABLE: return tr("Enable");
+#endif
         case COL_NAME: return tr("Name");
         case COL_EID: return lit("EID");
         case COL_ACTION: return lit("Action #");
@@ -746,6 +758,11 @@ struct EventItemModel : public QAbstractItemModel
     if(index.column() == COL_DURATION && role == Qt::TextAlignmentRole)
       return int(Qt::AlignRight | Qt::AlignVCenter);
 
+#if BRANCH_DEV
+    if (index.column() == COL_ENABLE && role == Qt::TextAlignmentRole)
+        return int(Qt::AlignHCenter | Qt::AlignVCenter);
+#endif
+
     if(index.internalId() == TagRoot)
     {
       if(role == Qt::DisplayRole && index.column() == COL_NAME)
@@ -772,6 +789,9 @@ struct EventItemModel : public QAbstractItemModel
           case COL_NAME: return tr("Capture Start");
           case COL_EID: return lit("0");
           case COL_ACTION: return lit("0");
+#if BRANCH_DEV
+          case COL_ENABLE: return QVariant();
+#endif
           default: break;
         }
       }
@@ -815,12 +835,21 @@ struct EventItemModel : public QAbstractItemModel
       if(index.column() == COL_DURATION && role == Qt::DisplayRole)
         return FormatDuration(eid);
 
+#if BRANCH_DEV
+      if (index.column() == COL_ENABLE && role == Qt::CheckStateRole)
+          return Qt::CheckState::PartiallyChecked;
+#endif
+
       if(role == Qt::DisplayRole)
       {
         const ActionDescription *action = m_Actions[eid];
 
         switch(index.column())
         {
+        #if BRANCH_DEV
+          case COL_ENABLE:
+            return QVariant();
+        #endif
           case COL_NAME: return GetCachedEIDName(eid);
           case COL_EID:
           case COL_ACTION:
@@ -899,6 +928,24 @@ struct EventItemModel : public QAbstractItemModel
     return QVariant();
   }
 
+#if BRANCH_DEV
+  bool setData(const QModelIndex& index, const QVariant& value, int role) override
+  {
+      return QAbstractItemModel::setData(index, value, role);
+  }
+
+  //触发setData
+  Qt::ItemFlags flags(const QModelIndex& index) const override
+  {
+      if (!index.isValid())
+          return 0;
+
+      Qt::ItemFlags ret = QAbstractItemModel::flags(index) | Qt::ItemIsUserCheckable;
+      ret |= Qt::ItemIsEditable;
+      return ret;
+  }
+#endif
+#pragma endregion
 private:
   ICaptureContext &m_Ctx;
 
@@ -3449,6 +3496,9 @@ EventBrowser::EventBrowser(ICaptureContext &ctx, QWidget *parent)
   ui->events->header()->setSectionResizeMode(COL_EID, QHeaderView::Interactive);
   ui->events->header()->setSectionResizeMode(COL_ACTION, QHeaderView::Interactive);
   ui->events->header()->setSectionResizeMode(COL_DURATION, QHeaderView::Interactive);
+#if BRANCH_DEV
+  ui->events->header()->setSectionResizeMode(COL_ENABLE, QHeaderView::Interactive);
+#endif
 
   ui->events->header()->setMinimumSectionSize(40);
 
@@ -3466,11 +3516,17 @@ EventBrowser::EventBrowser(ICaptureContext &ctx, QWidget *parent)
   ui->events->header()->resizeSection(COL_ACTION, 60);
   ui->events->header()->resizeSection(COL_NAME, 200);
   ui->events->header()->resizeSection(COL_DURATION, 80);
+#if BRANCH_DEV
+  ui->events->header()->resizeSection(COL_ENABLE, 60);
+#endif
 
   ui->events->header()->hideSection(COL_ACTION);
   ui->events->header()->hideSection(COL_DURATION);
 
   ui->events->header()->moveSection(COL_NAME, 2);
+#if BRANCH_DEV
+  ui->events->header()->moveSection(COL_ENABLE, 0);
+#endif
 
   UpdateDurationColumn();
 

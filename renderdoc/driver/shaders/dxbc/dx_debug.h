@@ -23,6 +23,12 @@
  ******************************************************************************/
 
 #pragma once
+#if BRANCH_DEV
+#include "api/replay/replay_enums.h"
+#include "api/replay/shader_types.h"
+#include "common/common.h"
+#include "os/os_specific.h"
+#endif    //  BRANCH_DEV
 
 #include <map>
 

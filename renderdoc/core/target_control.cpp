@@ -430,9 +430,49 @@ void RenderDoc::TargetControlClientThread(uint32_t version, Network::Socket *cli
   Threading::ReleaseModuleExitThread();
 }
 
+#if BRANCH_DEV && SOCKET_THREAD
+/*
+创建服务端
+*/
+void RenderDoc::TargetControlServerThread(RenderDoc *rdoc)
+{
+  Threading::SetCurrentThreadName("TargetControlServerThread");
+
+  uint32_t port = RenderDoc_FirstTargetControlPort;
+  RDCLOG("[SVR]TargetControlServerThread:host=%s,ip=%u", "0.0.0.0", port);
+  Network::Socket *sock = Network::CreateServerSocket("0.0.0.0", port & 0xffff, 4);
+
+  while(sock == NULL)
+  {
+    port++;
+    if(port > RenderDoc_LastTargetControlPort)
+    {
+      rdoc->m_RemoteIdent = 0;
+      break;
+    }
+
+    sock = Network::CreateServerSocket("0.0.0.0", port & 0xffff, 4);
+  }
+
+  if(sock)
+  {
+    rdoc->m_RemoteIdent = port;
+
+    rdoc->m_TargetControlThreadShutdown = false;
+
+    RDCLOG("Listening for target control on %u", port);
+  }
+  else
+  {
+    RDCWARN("Couldn't open socket for target control");
+    return;
+  }
+#else
+
 void RenderDoc::TargetControlServerThread(Network::Socket *sock)
 {
   Threading::SetCurrentThreadName("TargetControlServerThread");
+#endif
 
   Threading::KeepModuleAlive();
 

@@ -116,6 +116,7 @@ enum ReplayProxyPacket
 
 DECLARE_REFLECTION_ENUM(ReplayProxyPacket);
 
+//声明代理函数
 #define IMPLEMENT_FUNCTION_PROXIED(rettype, name, ...)                                  \
   rettype name(__VA_ARGS__);                                                            \
   template <typename ParamSerialiser, typename ReturnSerialiser>                        \
@@ -150,6 +151,13 @@ public:
 
   bool IsRemoteProxy() { return !m_RemoteServer; }
   RDResult FatalErrorCheck();
+  
+#if BRANCH_DEV
+  void SetFatalError(RDResult code) {
+      m_FatalError = code;
+  }
+#endif
+
   IReplayDriver *MakeDummyDriver();
   void Shutdown() { delete this; }
   RDResult ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers)

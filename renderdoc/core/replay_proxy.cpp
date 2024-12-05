@@ -29,6 +29,20 @@
 #include "replay/dummy_driver.h"
 #include "serialise/lz4io.h"
 
+#if BRANCH_DEV
+#if ENABLED(RDOC_ANDROID)
+#include <android/Debug/cpp/callstack.hpp>
+#endif
+//void _CheckError(ReplayProxy* pthis, ReplayProxyPacket receivedPacket, ReplayProxyPacket expectedPacket)
+//{
+//  bool cret = pthis->CheckError(receivedPacket, expectedPacket);
+//  if(cret)
+//    RDCERR("CheckError:%s", ToStr(cret).c_str());
+//}
+//#define CheckError(this, receivedPacket, expectedPacket) \
+//  _CheckError(this, receivedPacket, expectedPacket)
+#endif
+
 template <>
 rdcstr DoStringise(const ReplayProxyPacket &el)
 {
@@ -141,13 +155,14 @@ rdcstr DoStringise(const ReplayProxyPacket &el)
     if(m_RemoteServer)                                                                \
       fatalStatus = m_Remote->FatalErrorCheck();                                      \
     ReturnSerialiser &ser = retser;                                                   \
+    /*BeginChunk*/  \
     PACKET_HEADER(packet);                                                            \
     SERIALISE_ELEMENT(retval);                                                        \
     GET_SERIALISER.Serialise("fatalStatus"_lit, fatalStatus);                         \
     GET_SERIALISER.Serialise("packet"_lit, packet);                                   \
     ser.EndChunk();                                                                   \
     if(fatalStatus != ResultCode::Succeeded && m_FatalError == ResultCode::Succeeded) \
-      m_FatalError = fatalStatus;                                                     \
+      SetFatalError(fatalStatus);                                                     \
     CheckError(packet, expectedPacket);                                               \
   }
 
@@ -164,7 +179,7 @@ rdcstr DoStringise(const ReplayProxyPacket &el)
     GET_SERIALISER.Serialise("fatalStatus"_lit, fatalStatus);                         \
     ser.EndChunk();                                                                   \
     if(fatalStatus != ResultCode::Succeeded && m_FatalError == ResultCode::Succeeded) \
-      m_FatalError = fatalStatus;                                                     \
+      SetFatalError(fatalStatus);                                                     \
     CheckError(packet, expectedPacket);                                               \
   }
 
@@ -187,6 +202,10 @@ struct RemoteExecution
   }
   ~RemoteExecution() { m_Proxy->EndRemoteExecution(); }
 };
+/*
+remote_server.cpp
+tcp client执行
+*/
 #define REMOTE_EXECUTION() RemoteExecution exec(this);
 
 // uncomment the following to print verbose debugging prints for the remote proxy packets
@@ -203,6 +222,7 @@ struct RemoteExecution
 // the remote server or not.
 #define PROXY_FUNCTION(name, ...)                                     \
   PROXY_DEBUG("Proxying out %s", #name);                              \
+  RDCLOG("Proxying out Proxied_%s, RemoteServer=%d", #name, m_RemoteServer);                              \
   if(m_RemoteServer)                                                  \
     return CONCAT(Proxied_, name)(m_Reader, m_Writer, ##__VA_ARGS__); \
   else                                                                \
@@ -354,8 +374,15 @@ APIProperties ReplayProxy::Proxied_GetAPIProperties(ParamSerialiser &paramser,
 
   {
     REMOTE_EXECUTION();
+#if BRANCH_DEV
+    if (paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored) {
+        RDCLOG("Remote GetAPIProperties");
+        ret = m_Remote->GetAPIProperties();
+    }
+#else
     if(paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored)
       ret = m_Remote->GetAPIProperties();
+#endif
   }
 
   SERIALISE_RETURN(ret);
@@ -373,6 +400,9 @@ APIProperties ReplayProxy::Proxied_GetAPIProperties(ParamSerialiser &paramser,
 
 APIProperties ReplayProxy::GetAPIProperties()
 {
+#if BRANCH_DEV
+  RDCLOG("ReplayProxy::GetAPIProperties");
+#endif
   PROXY_FUNCTION(GetAPIProperties);
 }
 
@@ -711,6 +741,9 @@ rdcarray<EventUsage> ReplayProxy::GetUsage(ResourceId id)
 template <typename ParamSerialiser, typename ReturnSerialiser>
 FrameRecord ReplayProxy::Proxied_GetFrameRecord(ParamSerialiser &paramser, ReturnSerialiser &retser)
 {
+#if BRANCH_DEV
+    RDCLOG("[+]Proxied_GetFrameRecord");
+#endif
   const ReplayProxyPacket expectedPacket = eReplayProxy_GetFrameRecord;
   ReplayProxyPacket packet = eReplayProxy_GetFrameRecord;
   FrameRecord ret = {};
@@ -722,8 +755,17 @@ FrameRecord ReplayProxy::Proxied_GetFrameRecord(ParamSerialiser &paramser, Retur
 
   {
     REMOTE_EXECUTION();
+#if BRANCH_DEV
+    if (paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored) {
+        ret = m_Remote->GetFrameRecord();
+        if (ret.actionList.empty()) {
+            RDCERR("[-]RemoteServer FrameRecord.actionList.empty()");
+        }
+    }
+#else
     if(paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored)
       ret = m_Remote->GetFrameRecord();
+#endif
   }
 
   SERIALISE_RETURN(ret);
@@ -2044,6 +2086,9 @@ template <typename ParamSerialiser, typename ReturnSerialiser>
 void ReplayProxy::Proxied_ReplayLog(ParamSerialiser &paramser, ReturnSerialiser &retser,
                                     uint32_t endEventID, ReplayLogType replayType)
 {
+#if BRANCH_DEV
+  RDCLOG("Proxied_ReplayLog:%d", endEventID);
+#endif
   const ReplayProxyPacket expectedPacket = eReplayProxy_ReplayLog;
   ReplayProxyPacket packet = eReplayProxy_ReplayLog;
 
@@ -3047,6 +3092,9 @@ bool ReplayProxy::CheckError(ReplayProxyPacket receivedPacket, ReplayProxyPacket
     RDCERR("Fatal error detected while processing %s: %s", ToStr(expectedPacket).c_str(),
            ResultDetails(m_FatalError).Message().c_str());
     m_IsErrored = true;
+#if BRANCH_DEV && ENABLED(RDOC_ANDROID)
+    CDebug::backtraceToLogcat();
+#endif
     return true;
   }
 

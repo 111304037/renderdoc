@@ -107,6 +107,10 @@ CaptureSettings::operator QVariant() const
   opts[lit("captureAllCmdLists")] = options.captureAllCmdLists;
   opts[lit("debugOutputMute")] = options.debugOutputMute;
   opts[lit("softMemoryLimit")] = options.softMemoryLimit;
+#if BRANCH_DEV
+  opts[lit("captureVulkan")] = options.captureVulkan;
+  opts[lit("useNativeLayers")] = options.useNativeLayers;
+#endif
   ret[lit("options")] = opts;
 
   ret[lit("queuedFrameCap")] = queuedFrameCap;
@@ -151,6 +155,10 @@ CaptureSettings::CaptureSettings(const QVariant &v)
   options.captureAllCmdLists = opts[lit("captureAllCmdLists")].toBool();
   options.debugOutputMute = opts[lit("debugOutputMute")].toBool();
   options.softMemoryLimit = opts[lit("softMemoryLimit")].toUInt();
+#if BRANCH_DEV
+  options.captureVulkan = opts[lit("captureVulkan")].toBool();
+  options.useNativeLayers = opts[lit("useNativeLayers")].toBool();
+#endif
 
   if(data.contains(lit("queuedFrameCap")))
     queuedFrameCap = data[lit("queuedFrameCap")].toUInt();
@@ -165,6 +173,9 @@ CaptureSettings::CaptureSettings(const QVariant &v)
 rdcstr ConfigFilePath(const rdcstr &filename)
 {
   QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+#if BRANCH_DEV
+  qInfo() << "AppDataLocation:" << path;
+#endif
 
   QDir dir(path);
   if(!dir.exists())

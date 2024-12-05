@@ -1015,6 +1015,10 @@ The default is :data:`ReplayOptimisationLevel.Balanced`.
 )");
   ReplayOptimisationLevel optimisation = ReplayOptimisationLevel::Balanced;
 
+#if BRANCH_DEV
+  bool simpleShading = false;
+#endif
+
 // helpers for Qt, define constructor and cast. These will be defined in Qt code
 #if defined(RENDERDOC_QT_COMPAT)
   ReplayOptions(const QVariant &var);

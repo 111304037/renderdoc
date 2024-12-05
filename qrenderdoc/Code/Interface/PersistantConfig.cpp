@@ -816,6 +816,10 @@ ReplayOptions::ReplayOptions(const QVariant &var)
     forceGPUDriverName = map[lit("forceGPUDriverName")].toString();
   if(map.contains(lit("optimisation")))
     optimisation = (ReplayOptimisationLevel)map[lit("optimisation")].toUInt();
+#if BRANCH_DEV
+  if (map.contains(lit("simpleShading")))
+      simpleShading = map[lit("simpleShading")].toBool();
+#endif
 }
 
 ReplayOptions::operator QVariant() const
@@ -827,6 +831,9 @@ ReplayOptions::operator QVariant() const
   map[lit("forceGPUDeviceID")] = forceGPUDeviceID;
   map[lit("forceGPUDriverName")] = forceGPUDriverName;
   map[lit("optimisation")] = (uint32_t)optimisation;
+#if BRANCH_DEV
+  map[lit("simpleShading")] = (uint32_t)simpleShading;
+#endif
 
   return map;
 }

@@ -19,11 +19,32 @@ if(NOT ANDROID AND NOT APPLE)
     endif()
 endif()
 
+if(BRANCH_DEV AND WIN32)
+    list(APPEND sources 
+        nv_counters.cpp
+        nv_counters.h
+        nvapi_hooks.cpp
+        nvapi_wrapper.h
+        nvapi_wrapper.cpp
+        official/nvapi/nvapi.h
+        official/nvapi/nvapi_interface.h
+        official/PerfKit/include/NvPmApi.h
+        nv_d3d12_counters.h
+        nv_d3d12_counters.cpp
+        nv_d3d11_counters.h
+        nv_d3d11_counters.cpp
+    )
+endif()
+
 set(include_dirs
     ${RDOC_INCLUDES}
     "${CMAKE_CURRENT_SOURCE_DIR}/official/PerfSDK/redist/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/official/PerfSDK/redist/NvPerfUtility/include")
 
+if(BRANCH_DEV)
+build_library(rdoc_nv OBJECT ${sources} ${sources_gl} ${sources_vulkan})
+else()
 add_library(rdoc_nv OBJECT ${sources} ${sources_gl} ${sources_vulkan})
+endif()
 target_compile_definitions(rdoc_nv ${RDOC_DEFINITIONS})
 target_include_directories(rdoc_nv ${include_dirs})

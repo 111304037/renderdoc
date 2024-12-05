@@ -1440,34 +1440,35 @@ public:
     };
 
     enum ItemDataRole {
-        DisplayRole = 0,
-        DecorationRole = 1,
-        EditRole = 2,
-        ToolTipRole = 3,
-        StatusTipRole = 4,
-        WhatsThisRole = 5,
+        DisplayRole = 0,//用于获取项的显示文本。通常这是用户在视图中看到的主要文本
+        DecorationRole = 1,//用于获取项的装饰，例如图标或图片。
+        EditRole = 2,//用于项的编辑。通常与 DisplayRole 相同，但在某些情况下可能需要不同的值以支持编辑操作。
+        ToolTipRole = 3,//用于获取项的工具提示文本，当用户将鼠标悬停在项上时，显示的提示信息。
+        StatusTipRole = 4,//用于获取状态栏提示文本，通常用于在应用程序的状态栏中显示简短的描述。
+        WhatsThisRole = 5,//用于获取“这是什么？”提示，通常在用户请求更多信息时显示。
         // Metadata
-        FontRole = 6,
-        TextAlignmentRole = 7,
-        BackgroundColorRole = 8,
+        FontRole = 6,//用于获取项的字体信息。
+        TextAlignmentRole = 7,//用于获取项的文本对齐方式。
+        BackgroundColorRole = 8,//用于获取项的背景颜色。
         BackgroundRole = 8,
-        TextColorRole = 9,
+        TextColorRole = 9,//用于获取项的文本颜色。
         ForegroundRole = 9,
-        CheckStateRole = 10,
+        CheckStateRole = 10,//用于获取和设置项的选中状态（例如复选框的状态）。
         // Accessibility
-        AccessibleTextRole = 11,
-        AccessibleDescriptionRole = 12,
+        AccessibleTextRole = 11,//为无障碍工具提供的文本。
+        AccessibleDescriptionRole = 12,//为无障碍工具提供的描述。
         // More general purpose
-        SizeHintRole = 13,
-        InitialSortOrderRole = 14,
+        SizeHintRole = 13,//用于获取项的大小提示，影响项的显示大小。
+        InitialSortOrderRole = 14,//用于获取项的初始排序顺序。
         // Internal UiLib roles. Start worrying when public roles go that high.
+        //这些角色通常用于 Qt 的内部实现，开发者很少直接使用：
         DisplayPropertyRole = 27,
         DecorationPropertyRole = 28,
         ToolTipPropertyRole = 29,
         StatusTipPropertyRole = 30,
         WhatsThisPropertyRole = 31,
         // Reserved
-        UserRole = 0x0100
+        UserRole = 0x0100   //用于自定义角色。开发者可以在此基础上定义自己的角色，以避免与 Qt 的内置角色冲突。
     };
 
     enum ItemFlag {

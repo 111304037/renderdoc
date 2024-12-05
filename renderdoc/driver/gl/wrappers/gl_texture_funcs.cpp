@@ -7494,3 +7494,34 @@ INSTANTIATE_FUNCTION_SERIALISED(void, glInvalidateTexImage, GLuint texture, GLin
 INSTANTIATE_FUNCTION_SERIALISED(void, glInvalidateTexSubImage, GLuint texture, GLint level,
                                 GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width,
                                 GLsizei height, GLsizei depth);
+
+
+#if BRANCH_DEV
+//华为glEGLImageTargetTexture2DOES无法截帧
+INSTANTIATE_FUNCTION_SERIALISED(void, glEGLImageTargetTexture2DOES, GLenum target, GLeglImageOES image);
+//回放调用
+void WrappedOpenGL::glEGLImageTargetTexture2DOES(GLenum target, GLeglImageOES image)
+{
+  SERIALISE_TIME_CALL(
+      GL.glEGLImageTargetTexture2DOES(
+        target, image
+      )
+  );
+}
+//序列化
+template <typename SerialiserType>
+bool WrappedOpenGL::Serialise_glEGLImageTargetTexture2DOES(SerialiserType &ser, GLenum target, GLeglImageOES image)
+{
+  SERIALISE_ELEMENT(target);
+  //SERIALISE_ELEMENT(image);
+
+  SERIALISE_CHECK_READ_ERRORS();
+
+  if(IsReplayingAndReading())
+  {
+    GL.glEGLImageTargetTexture2DOES(target, image);
+  }
+
+  return true;
+}
+#endif

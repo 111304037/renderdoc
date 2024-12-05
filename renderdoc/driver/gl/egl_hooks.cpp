@@ -591,7 +591,14 @@ HOOK_EXPORT const char *EGLAPIENTRY eglQueryString_renderdoc_hooked(EGLDisplay d
     if(extStr == NULL)
       extStr = eglhook.extStrings[dpy] = new rdcstr;
 
+#if BRANCH_DEV
+    const char* cStr = EGL.QueryString(dpy, name);
+    if(cStr == NULL)
+      return cStr;
+    rdcstr implExtStr = cStr;
+#else
     const rdcstr implExtStr = EGL.QueryString(dpy, name);
+#endif
 
     rdcarray<rdcstr> exts;
     split(implExtStr, exts, ' ');
@@ -969,6 +976,13 @@ EGL_PASSTHRU_4(EGLSurface, eglCreatePlatformPixmapSurface, EGLDisplay, dpy, EGLC
                void *, native_pixmap, const EGLAttrib *, attrib_list)
 EGL_PASSTHRU_3(EGLBoolean, eglWaitSync, EGLDisplay, dpy, EGLSync, sync, EGLint, flags)
 
+#if BRANCH_DEV
+//华为
+EGL_PASSTHRU_1(EGLClientBuffer, eglGetNativeClientBufferANDROID, const struct AHardwareBuffer *, buffer)
+EGL_PASSTHRU_5(EGLImageKHR, eglCreateImageKHR, EGLDisplay, dpy, EGLContext, ctx, EGLenum, target,
+               EGLClientBuffer, buffer, const EGLAttrib *, attrib_list)
+#endif
+
 static void EGLHooked(void *handle)
 {
   RDCDEBUG("EGL library hooked");
@@ -1037,6 +1051,15 @@ bool ShouldHookEGL()
 
 bool ShouldHookEGL()
 {
+#if BRANCH_DEV
+  if (RenderDoc::Inst().GetCaptureOptions().useNativeLayers) {
+    return false;
+  }
+  else {
+      return true;
+  }
+#endif
+
   void *egl_handle = dlopen("libEGL.so", RTLD_LAZY);
   PFN_eglQueryString query_string = (PFN_eglQueryString)dlsym(egl_handle, "eglQueryString");
   if(!query_string)

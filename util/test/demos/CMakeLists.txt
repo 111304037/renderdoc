@@ -236,7 +236,7 @@ if(APPLE)
         apple/apple_platform.h
         apple/apple_window.cpp
         apple/apple_window.h)
-    add_executable(demos ${SRC} ${VULKAN_SRC})
+    build_executable(demos ${SRC} ${VULKAN_SRC})
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wno-deprecated-declarations")
 elseif(BUILD_ANDROID)
     string(REPLACE "\\" "/" GLUE_SOURCE "${ANDROID_NDK_ROOT_PATH}/sources/android/native_app_glue/android_native_app_glue.c")
@@ -251,7 +251,7 @@ elseif(BUILD_ANDROID)
         android/android_window.cpp
         android/android_window.h
         ${GLUE_SOURCE})
-    add_library(demos SHARED ${SRC} ${VULKAN_SRC} ${OPENGL_SRC})
+    build_library(demos SHARED ${SRC} ${VULKAN_SRC} ${OPENGL_SRC})
 elseif(UNIX)
     list(APPEND OPENGL_SRC
         3rdparty/glad/glad_glx.c
@@ -261,7 +261,7 @@ elseif(UNIX)
         linux/linux_platform.h
         linux/linux_window.cpp
         linux/linux_window.h)
-    add_executable(demos ${SRC} ${VULKAN_SRC} ${OPENGL_SRC})
+    build_executable(demos ${SRC} ${VULKAN_SRC} ${OPENGL_SRC})
 endif()
 
 install(TARGETS demos DESTINATION .)

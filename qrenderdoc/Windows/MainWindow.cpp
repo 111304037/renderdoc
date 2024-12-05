@@ -223,7 +223,7 @@ MainWindow::MainWindow(ICaptureContext &ctx) : QMainWindow(NULL), ui(new Ui::Mai
   QObject::connect(statusText, &RDLabel::doubleClicked, this, &MainWindow::statusDoubleClicked);
 
   QObject::connect(&m_MessageTick, &QTimer::timeout, this, &MainWindow::messageCheck);
-  m_MessageTick.setSingleShot(false);
+  m_MessageTick.setSingleShot(false);//true:只执行一次
   m_MessageTick.setInterval(175);
   m_MessageTick.start();
 
@@ -1932,6 +1932,7 @@ void MainWindow::FillRemotesMenu(QMenu *menu, bool includeLocalhost)
 
 void MainWindow::setRemoteHost(int hostIdx)
 {
+    qInfo() << "[+]setRemoteHost:" << hostIdx;
   if(!PromptCloseCapture())
     return;
 
@@ -2148,6 +2149,7 @@ void MainWindow::switchContext()
 
   bool ok = false;
   int hostIdx = item->data().toInt(&ok);
+  qInfo() << "连接设备:" << hostIdx;
 
   if(ok)
     setRemoteHost(hostIdx);

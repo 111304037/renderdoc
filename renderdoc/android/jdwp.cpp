@@ -96,7 +96,11 @@ void InjectVulkanLayerSearchPath(Connection &conn, threadID thread, int32_t slot
   conn.SetLocalValue(thread, stack[0].id, slotIdx, temp);
 }
 
+#if BRANCH_DEV
+bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock, rdcstr RDCLib, const CaptureOptions& opts)
+#else
 bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
+#endif
 {
   Connection conn(sock);
 
@@ -125,10 +129,46 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     {
       value val = conn.GetFieldValue(buildClass, CPU_ABI);
 
+#if !BRANCH_DEV
       if(val.tag == Tag::String)
         abi = Android::GetABI(conn.GetString(val.String));
       else
         RDCERR("CPU_ABI value was type %u, not string!", (uint32_t)val.tag);
+#else
+      if(val.tag == Tag::String)
+      {
+        rdcstr adbAbi = conn.GetString(val.String);
+        bool isEmulator = false;
+        rdcarray<Android::ABI> abis = Android::GetSupportedABIs(deviceID);
+        if(abis[0] == Android::ABI::x86)
+        {
+          isEmulator = true;
+           if(adbAbi == "x86")
+           {
+             /*adbAbi = "armeabi-v7a";
+             RDCLOG("jdwp.cpp: correct abi x86 => armeabi-v7a");*/
+           }else if(adbAbi == "x86_64")
+           {
+             /*adbAbi  = "arm64-v8a";
+             RDCLOG("GetSupportedABIs: correct abi x86_64 => arm64-v8a");*/
+           }else if(adbAbi == "armeabi-v7a")
+           {
+             adbAbi = "x86";
+             RDCLOG("jdwp.cpp: correct abi x86 => armeabi-v7a");
+           }
+           else if(adbAbi == "arm64-v8a")
+           {
+             adbAbi = "x86_64";
+             RDCLOG("GetSupportedABIs: correct abi x86_64 => arm64-v8a");
+           }
+        }
+
+        abi = Android::GetABI(adbAbi);
+      }
+      else
+        RDCERR("CPU_ABI value was type %u, not string!", (uint32_t)val.tag);
+#endif
+
     }
     else
     {
@@ -146,6 +186,29 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     abi = Android::ABI::armeabi_v7a;
   }
 
+#if BRANCH_DEV
+  rdcstr libPath;
+  if(RDCLib.isEmpty())
+  {
+    libPath = Android::GetPathForPackage(deviceID, Android::GetRenderDocPackageForABI(abi));
+
+    switch(abi)
+    {
+      case Android::ABI::unknown:
+      case Android::ABI::armeabi_v7a: libPath += "lib/arm"; break;
+      case Android::ABI::arm64_v8a: libPath += "lib/arm64"; break;
+      case Android::ABI::x86_64: libPath += "lib/x86_64"; break;
+      case Android::ABI::x86: libPath += "lib/x86"; break;
+    }
+    RDCLib = StringFormat::Fmt("%s/%s", libPath.c_str(), RENDERDOC_ANDROID_LIBRARY);
+  }
+  else
+  {
+    libPath = get_dirname(RDCLib);
+    RDCLib = RENDERDOC_ANDROID_LIBRARY;
+  }
+  RDCLOG("Injecting RenderDoc from library in %s", RDCLib.c_str());
+#else
   rdcstr libPath = Android::GetPathForPackage(deviceID, Android::GetRenderDocPackageForABI(abi));
 
   switch(abi)
@@ -158,10 +221,14 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
   }
 
   RDCLOG("Injecting RenderDoc from library in %s", libPath.c_str());
+#endif
 
   if(conn.IsErrored())
     return false;
 
+#if BRANCH_DEV
+if (opts.captureVulkan) {
+#endif
   // try to find the vulkan loader class and patch the search path when getClassLoader is called.
   // This is an optional step as some devices may not support vulkan and may not have this class, so
   // in that case we just skip it.
@@ -266,6 +333,9 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     // warning only - it's not a problem if we're capturing GLES
     RDCWARN("Couldn't find class android.app.ApplicationLoaders. Vulkan won't be hooked.");
   }
+#if BRANCH_DEV
+}
+#endif
 
   // we get here whether we processed vulkan or not. Now we need to wait for the application to hit
   // onCreate() and load our library
@@ -347,6 +417,14 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     RDCERR("Failed to call this.getClass()!");
     return false;
   }
+#if BRANCH_DEV
+  else
+  {
+    methodID toStrMethod = conn.GetMethod(thisClass.RefType, "toString", "()Ljava/lang/String;");
+    value toStrRet = conn.InvokeInstance(thread, thisClass.RefType, toStrMethod, thisPtr, {});
+    RDCLOG("[*]Entry Application type:%s", conn.GetString(toStrRet.String).c_str());
+  }
+#endif
 
   // look up onCreate in the most derived class - since we can't guarantee that the base
   // application.app.onCreate() will get called.
@@ -384,6 +462,9 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     return false;
   }
 
+#if BRANCH_DEV
+#if USE_RUNTIME_LOAD
+#endif
   // find java.lang.Runtime
   referenceTypeID runtime = conn.GetType("Ljava/lang/Runtime;");
 
@@ -413,6 +494,25 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     return false;
   }
 
+  
+#if BRANCH_DEV
+  RDCLOG("jdwp call Runtime.load(%s)", RDCLib.c_str());
+  
+  // call Runtime.load() on our library. This will load the library and from then on it's
+  // responsible for injecting its hooks into GLES on its own. See android_hook.cpp for more
+  // information on the implementation
+  value ret = conn.InvokeInstance(thread, runtime, load, runtimeObject.Object,
+                                  {conn.NewString(thread, RDCLib)});
+  if(ret.tag != Tag::Void)
+  {
+    RDCERR("Failed to call load(%s)!", RDCLib.c_str());
+    return false;
+  }
+  else
+  {
+    RDCLOG("call Runtime.load(%s), entry is posix_libentry.cpp", RDCLib.c_str());
+  }
+#else
   // call Runtime.load() on our library. This will load the library and from then on it's
   // responsible for injecting its hooks into GLES on its own. See android_hook.cpp for more
   // information on the implementation
@@ -424,20 +524,69 @@ bool InjectLibraries(const rdcstr &deviceID, Network::Socket *sock)
     RDCERR("Failed to call load(%s/%s)!", libPath.c_str(), RENDERDOC_ANDROID_LIBRARY);
     return false;
   }
+#endif
+#if BRANCH_DEV
+#else
+#endif
+  // System.Load
+  // find java.lang.Runtime
+  referenceTypeID SystemType = conn.GetType("Ljava/lang/System;");
 
+  if(SystemType == 0)
+  {
+    RDCERR("Couldn't find java.lang.Runtime");
+    return false;
+  }
+  methodID loadMethod = conn.GetMethod(SystemType, "load", "(Ljava/lang/String;)V");
+
+  if(loadMethod == 0)
+  {
+    RDCERR("Couldn't find java.lang.System.load() %llu", (uint64_t)loadMethod);
+    return false;
+  }
+
+  RDCLOG("jdwp call System.load(%s)", RDCLib.c_str());
+  // get the Runtime object via java.lang.Runtime.getRuntime()
+  value loadRet = conn.InvokeStatic(thread, SystemType, loadMethod, {conn.NewString(thread, RDCLib)});
+  /* referenceTypeID loadTestClass = thisClass.RefType;
+   methodID loadTestMethod = conn.GetMethod(thisClass.RefType, "loadTest", "(Ljava/lang/String;)V",
+   &loadTestClass); value loadRet = conn.InvokeStatic(thread, thisClass.RefType, loadTestMethod, {conn.NewString(thread,
+   RDCLib)});*/
+
+  if(loadRet.tag != Tag::Void)
+  {
+    RDCERR("Failed to call System.load(%s)!", RDCLib.c_str());
+    return false;
+  }
+  else
+  {
+    RDCLOG("call System.load(%s), entry is posix_libentry.cpp", RDCLib.c_str());
+  }
+#if BRANCH_DEV
+#endif
+#endif
   return true;
 }
 };    // namespace JDWP
 
 namespace Android
 {
+#if BRANCH_DEV
+bool InjectWithJDWP(const rdcstr &deviceID, uint16_t jdwpport, rdcstr RDCLib, const CaptureOptions& opts)
+#else
 bool InjectWithJDWP(const rdcstr &deviceID, uint16_t jdwpport)
+#endif
 {
+    RDCLOG("[*]jdwp create client socket");
   Network::Socket *sock = Network::CreateClientSocket("localhost", jdwpport, 500);
 
   if(sock)
   {
+#if BRANCH_DEV
+    bool ret = JDWP::InjectLibraries(deviceID, sock, RDCLib, opts);
+#else
     bool ret = JDWP::InjectLibraries(deviceID, sock);
+#endif
     delete sock;
 
     return ret;

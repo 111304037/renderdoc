@@ -105,6 +105,10 @@ ABI GetABI(const rdcstr &abiName)
   else if(abiName == "x86_64")
     return ABI::x86_64;
 
+#if BRANCH_DEV
+  if(abiName == "x86-v7a")
+    return ABI::x86;
+#endif
   RDCWARN("Unknown or unsupported ABI %s", abiName.c_str());
 
   return ABI::unknown;
@@ -128,15 +132,38 @@ rdcarray<ABI> GetSupportedABIs(const rdcstr &deviceID)
 {
   rdcstr adbAbi = adbExecCommand(deviceID, "shell getprop ro.product.cpu.abi").strStdout.trimmed();
 
+#if BRANCH_DEV
+  // if(adbAbi == "x86")
+  // {
+  //   adbAbi = "armeabi-v7a";
+  //   RDCLOG("GetSupportedABIs: correct abi x86 => armeabi-v7a");
+  // }else if(adbAbi == "x86_64")
+  // {
+  //   adbAbi = "arm64-v8a";
+  //   RDCLOG("GetSupportedABIs: correct abi x86_64 => arm64-v8a");
+  // }
+
+#endif
+
   // these returned lists should be such that the first entry is the 'lowest command denominator' -
   // typically 32-bit.
   switch(GetABI(adbAbi))
   {
+#if BRANCH_DEV
+    case ABI::arm64_v8a: return {ABI::arm64_v8a};
+#else
     case ABI::arm64_v8a: return {ABI::armeabi_v7a, ABI::arm64_v8a};
+#endif
     case ABI::armeabi_v7a: return {ABI::armeabi_v7a};
     case ABI::x86_64: return {ABI::x86, ABI::x86_64};
     case ABI::x86: return {ABI::x86};
+#if BRANCH_DEV
+    default: 
+		  RDCERR("GetSupportedABIs: unknow abi:%s", adbAbi.c_str());
+		  break;
+#else
     default: break;
+#endif
   }
 
   return {};
@@ -150,6 +177,7 @@ rdcstr GetRenderDocPackageForABI(ABI abi)
 rdcstr GetPathForPackage(const rdcstr &deviceID, const rdcstr &packageName)
 {
   rdcstr pkgPath = adbExecCommand(deviceID, "shell pm path " + packageName).strStdout.trimmed();
+  RDCLOG("GetPathForPackage:%s => %s", packageName.c_str(), pkgPath.c_str());
 
   // if there are multiple slices, the path will be returned on many lines. Take only the first
   // line, assuming all of the apks are in the same directory

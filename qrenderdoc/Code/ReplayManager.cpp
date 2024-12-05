@@ -247,6 +247,9 @@ QString ReplayManager::GetCurrentProcessingTag()
   return m_CommandTag;
 }
 
+/*
+ReplayManager::run中执行
+*/
 void ReplayManager::AsyncInvoke(const rdcstr &tag, ReplayManager::InvokeCallback m)
 {
   QString qtag;
@@ -277,6 +280,9 @@ void ReplayManager::AsyncInvoke(const rdcstr &tag, ReplayManager::InvokeCallback
   PushInvoke(cmd);
 }
 
+/*
+ReplayManager::run中执行
+*/
 void ReplayManager::AsyncInvoke(ReplayManager::InvokeCallback m)
 {
   InvokeHandle *cmd = new InvokeHandle(m);
@@ -285,6 +291,9 @@ void ReplayManager::AsyncInvoke(ReplayManager::InvokeCallback m)
   PushInvoke(cmd);
 }
 
+/*
+ReplayManager::run中执行
+*/
 void ReplayManager::BlockInvoke(ReplayManager::InvokeCallback m)
 {
   InvokeHandle *cmd = new InvokeHandle(m);
@@ -387,8 +396,15 @@ void ReplayManager::PingRemote()
   {
     if(!IsRunning() || m_Thread->isCurrentThread())
     {
+#if !BRANCH_DEV
       if(!m_Remote->Ping().OK())
         m_RemoteHost.SetShutdown();
+#else
+        if (!m_Remote->Ping().OK()) {
+            qInfo() << "ping fail,server disconnect:"<< CurrentRemote().Hostname().c_str();
+            m_RemoteHost.SetShutdown();
+        }
+#endif
     }
     m_RemoteLock.unlock();
   }
@@ -473,6 +489,7 @@ void ReplayManager::run(int proxyRenderer, const QString &capturefile, const Rep
   // main render command loop
   while(m_Running)
   {
+      //执行Replay.AsyncInvoke
     InvokeHandle *cmd = NULL;
 
     // wait for the condition to be woken, grab top of current queue,
@@ -518,7 +535,7 @@ void ReplayManager::run(int proxyRenderer, const QString &capturefile, const Rep
       delete cmd;
     else
       cmd->processed.release();
-  }
+  }//end while
 
   // clean up anything left in the queue
   {

@@ -122,9 +122,30 @@ elseif(UNIX)
     
     configure_file(${json_in} ${json_out})
 
+elseif(BRANCH_DEV AND WIN32)
+    list(APPEND sources vk_win32.cpp)
+    if(ENABLE_WAYLAND)
+        add_definitions(-DVK_USE_PLATFORM_WAYLAND_KHR)
+    endif()
+    
+    add_definitions(-DVK_USE_PLATFORM_WIN32_KHR)
+
+    set(VULKAN_LAYER_MODULE_PATH "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}/${LIB_SUBFOLDER_TRAIL_SLASH}librenderdoc.dll")
+    set(VULKAN_ENABLE_VAR "ENABLE_VULKAN_RENDERDOC_CAPTURE")
+
+    set(json_in ${CMAKE_CURRENT_SOURCE_DIR}/renderdoc.json)
+    set(json_out ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/renderdoc_capture${VULKAN_JSON_SUFFIX}.json)
+
+    configure_file(${json_in} ${json_out})
+
     install (FILES ${json_out} DESTINATION ${VULKAN_LAYER_FOLDER})
 endif()
 
+if(BRANCH_DEV)
+build_library(rdoc_vulkan OBJECT ${sources})
+my_set_target_folder(rdoc_vulkan "DLL/drivers/RHI")
+else()
 add_library(rdoc_vulkan OBJECT ${sources})
+endif()
 target_compile_definitions(rdoc_vulkan ${definitions})
 target_include_directories(rdoc_vulkan ${RDOC_INCLUDES})

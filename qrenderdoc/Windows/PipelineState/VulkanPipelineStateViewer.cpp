@@ -1748,6 +1748,10 @@ void VulkanPipelineStateViewer::setState()
   m_ShowUnused = ui->showUnused->isChecked();
   m_ShowEmpty = ui->showEmpty->isChecked();
 
+#if BRANCH_DEV
+  m_RevertSimpleShading = ui->revertSimpleShading->isChecked();
+#endif
+
   m_CombinedImageSamplers.clear();
 
   const VKPipe::State &state = *m_Ctx.CurVulkanPipelineState();
@@ -5344,3 +5348,10 @@ void VulkanPipelineStateViewer::computeDebugSelector_beginDebug(
 
   m_Ctx.AddDockWindow(s->Widget(), DockReference::AddTo, this);
 }
+
+#if BRANCH_DEV
+void VulkanPipelineStateViewer::on_revert_simple_shading_toggled(bool checked)
+{
+  setState();
+}
+#endif

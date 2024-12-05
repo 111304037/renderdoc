@@ -110,16 +110,31 @@ Socket *Socket::AcceptClient(uint32_t timeoutMilliseconds)
 
     if(s != -1)
     {
+      RDCLOG("[SVR]accept client:%d", s);
       int flags = fcntl(s, F_GETFL, 0);
+      /*
+      把sock设定为非阻塞模式，则之后的connect、accept、recv、recvfrom
+      等函数便失去了阻塞功能，变成了非阻塞函数
+      */
       fcntl(s, F_SETFL, flags | O_NONBLOCK);
 
       flags = fcntl(s, F_GETFD, 0);
+      /*
+      当fork子进程后，仍然可以使用socket。但执行exec后系统就会自动关闭子进程中的socket
+      */
       fcntl(s, F_SETFD, flags | FD_CLOEXEC);
 
       int nodelay = 1;
+      /*
+      端口复用，防止socket异常关闭后，端口被占用不释放
+      */
       setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
 
+#if BRANCH_DEV
+      return new Socket((ptrdiff_t)s, StringFormat::Fmt("AcceptClient_%d",(int)s));
+#else
       return new Socket((ptrdiff_t)s);
+#endif
     }
 
     int err = errno;
@@ -357,6 +372,7 @@ uint32_t GetIPFromTCPSocket(int socket)
 
 Socket *CreateTCPServerSocket(const rdcstr &bindaddr, uint16_t port, int queuesize)
 {
+  RDCLOG("[SVR]CreateTCPServerSocket bindaddr=%s,port=%d,queuesize=%d", bindaddr.c_str(),port, queuesize);
   int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
   int yes = 1;
@@ -396,11 +412,16 @@ Socket *CreateTCPServerSocket(const rdcstr &bindaddr, uint16_t port, int queuesi
   flags = fcntl(s, F_GETFD, 0);
   fcntl(s, F_SETFD, flags | FD_CLOEXEC);
 
+#if BRANCH_DEV
+  return new Socket((ptrdiff_t)s,StringFormat::Fmt("tcp_%s:%d",bindaddr.c_str(), port));
+#else
   return new Socket((ptrdiff_t)s);
+#endif
 }
 
 Socket *CreateAbstractServerSocket(uint16_t port, int queuesize)
 {
+  RDCLOG("[SVR]CreateAbstractServerSocket port=%d,queuesize=%d", port, queuesize);
   int s = socket(AF_UNIX, SOCK_STREAM, 0);
 
   if(s == -1)
@@ -443,11 +464,17 @@ Socket *CreateAbstractServerSocket(uint16_t port, int queuesize)
   flags = fcntl(s, F_GETFD, 0);
   fcntl(s, F_SETFD, flags | FD_CLOEXEC);
 
+#if BRANCH_DEV
+  return new Socket((ptrdiff_t)s,StringFormat::Fmt("server_%d",port));
+#else
   return new Socket((ptrdiff_t)s);
+#endif
 }
 
 Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
 {
+  RDCLOG("[SVR]CreateClientSocket %s:%d,timeoutMS=%d", host.c_str(), port, timeoutMS);
+
   addrinfo hints;
   RDCEraseEl(hints);
   hints.ai_family = AF_INET;
@@ -458,7 +485,7 @@ Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
   int res = getaddrinfo(host.c_str(), ToStr(port).c_str(), &hints, &addrResult);
   if(res != 0)
   {
-    RDCDEBUG("%s", gai_strerror(res));
+    RDCLOG("[SVR]%s", gai_strerror(res));
   }
 
   for(addrinfo *ptr = addrResult; ptr != NULL; ptr = ptr->ai_next)
@@ -495,7 +522,7 @@ Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
 
         if(result <= 0)
         {
-          RDCDEBUG("Timed out");
+          RDCLOG("[SVR]Timed out");
           close(s);
           continue;
         }
@@ -506,7 +533,7 @@ Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
 
       if(err != 0)
       {
-        RDCDEBUG("%s", errno_string(err).c_str());
+        RDCLOG("[SVR]%s", errno_string(err).c_str());
         close(s);
         continue;
       }
@@ -517,12 +544,16 @@ Socket *CreateClientSocket(const rdcstr &host, uint16_t port, int timeoutMS)
 
     freeaddrinfo(addrResult);
 
+#if BRANCH_DEV
+    return new Socket((ptrdiff_t)s,StringFormat::Fmt("client_%s:%d",host.c_str(), port));
+#else
     return new Socket((ptrdiff_t)s);
+#endif
   }
 
   freeaddrinfo(addrResult);
 
-  RDCDEBUG("Failed to connect to %s:%d", host.c_str(), port);
+  RDCLOG("[SVR]Failed to connect to %s:%d", host.c_str(), port);
   return NULL;
 }
 };

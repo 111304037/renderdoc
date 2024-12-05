@@ -83,6 +83,9 @@ void CreateParentDirectory(const rdcstr &filename)
 
   // want trailing slash so that we create all directories
   fn.push_back('/');
+#if BRANCH_DEV
+  RDCLOG("CreateParentDirectory:%s,%s", filename.c_str(), fn.c_str());
+#endif
 
   int offs = fn.find('/', 1);
 
@@ -91,7 +94,15 @@ void CreateParentDirectory(const rdcstr &filename)
     // create directory path from 0 to offs by NULLing the
     // / at offs, mkdir, then set it back
     fn[offs] = 0;
+#if BRANCH_DEV
+    if(access(fn.c_str(),0) != 0){
+      //sdk >= 30需要动态请求权限
+      int ret = mkdir(fn.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+      RDCLOG("---CreateDirectory:%s, ret=%d", fn.c_str(),ret);
+    }
+#else
     mkdir(fn.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+#endif
     fn[offs] = '/';
 
     offs = fn.find('/', offs + 1);

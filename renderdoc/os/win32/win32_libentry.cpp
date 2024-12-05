@@ -33,6 +33,17 @@
 
 static BOOL add_hooks()
 {
+#if ENABLED(RDOC_WIN32)
+  {
+    rdcstr target;
+    rdcstr capture_filename, log_filename;
+    const rdcstr base = "RenderDoc_win32";
+    FileIO::GetDefaultFiles(base, capture_filename, log_filename, target);
+    RDCLOGFILE(log_filename.c_str());
+    RDCLOG("win32_libentry set log:%s", log_filename.c_str());
+  }
+#endif
+
   wchar_t curFile[512];
   GetModuleFileNameW(NULL, curFile, 512);
 
@@ -76,6 +87,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 {
   if(ul_reason_for_call == DLL_PROCESS_ATTACH)
   {
+    //MessageBoxA(0, "DllMain", "renderdoc", MB_SYSTEMMODAL);
     BOOL ret = add_hooks();
     SetLastError(0);
     return ret;
