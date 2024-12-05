@@ -1,0 +1,1 @@
+extensions复制到安装目录

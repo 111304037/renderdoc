@@ -1,0 +1,67 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        //applicationId "com.xinglely.gles"
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode rootProject.ext.versionCode
+        versionName rootProject.ext.versionName
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters rootProject.ext.abiFilters.split(",")
+        }
+        externalNativeBuild {
+            cmake {
+                abiFilters rootProject.ext.abiFilters.split(",")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version rootProject.ext.cmakeVersion
+        }
+    }
+
+    // compileOptions {
+    //     sourceCompatibility JavaVersion.VERSION_1_8
+    //     targetCompatibility JavaVersion.VERSION_1_8
+    // }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    packagingOptions {
+        doNotStrip rootProject.ext.doNotStrip
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false //是否压缩代码，会导致无法断点
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            renderscriptDebuggable true
+            debuggable true
+            jniDebuggable true
+            shrinkResources false
+            ndk.debugSymbolLevel = 'FULL'
+        }
+    }
+}
+
+dependencies {
+    //implementation project(':Moudle:Unity_Lib')
+
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'com.android.support.constraint:constraint-layout:2.0.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+}
